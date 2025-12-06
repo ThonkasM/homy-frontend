@@ -5,21 +5,31 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "expocourse",
+    "scheme": "homi",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.thonkasm.homi",
+      "supportsTablet": true,
+      "config": {
+        "googleMapsApiKey": "AIzaSyDWn2NS1Cw56PwjFuupW8QHW80FwNnicS4"
+      }
     },
     "android": {
+      "package": "com.thonkasm.homi",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "edgeToEdgeEnabled": false,
+      "predictiveBackGestureEnabled": false,
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDWn2NS1Cw56PwjFuupW8QHW80FwNnicS4"
+        }
+      }
     },
     "web": {
       "output": "static",
