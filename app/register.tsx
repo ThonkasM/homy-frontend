@@ -1,7 +1,10 @@
 import { useAuth } from "@/context/auth-context";
+import { uploadService } from "@/services/upload-service";
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const styles = StyleSheet.create({
@@ -178,12 +181,71 @@ const styles = StyleSheet.create({
         fontSize: 12,
         marginBottom: 12,
     },
+    avatarSection: {
+        alignItems: 'center',
+        marginBottom: 24,
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e2e8f0',
+    },
+    avatarLabel: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#1e40af',
+        marginBottom: 12,
+    },
+    avatarContainer: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: '#f0f4ff',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
+        borderColor: '#3b82f6',
+        marginBottom: 12,
+        overflow: 'hidden',
+    },
+    avatarImage: {
+        width: 100,
+        height: 100,
+    },
+    selectPhotoBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        backgroundColor: '#dbeafe',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#3b82f6',
+    },
+    selectPhotoBtnText: {
+        color: '#3b82f6',
+        fontWeight: '600',
+        fontSize: 13,
+    },
+    removePhotoBtn: {
+        marginTop: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        backgroundColor: '#fee2e2',
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#ef4444',
+    },
+    removePhotoBtnText: {
+        color: '#ef4444',
+        fontWeight: '600',
+        fontSize: 12,
+    },
 });
 
 export default function RegisterScreen() {
     const router = useRouter();
-    const { register, isLoading, error, clearError } = useAuth();
-    
+    const { register, isLoading, error, clearError, updateUser } = useAuth();
+
     const [firstName, setFirstName] = useState("");
     const [lastName, setLastName] = useState("");
     const [email, setEmail] = useState("");
@@ -193,10 +255,33 @@ export default function RegisterScreen() {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [agreeTerms, setAgreeTerms] = useState(false);
+    const [avatarUri, setAvatarUri] = useState<string | null>(null);
+    const [uploading, setUploading] = useState(false);
 
     const validateEmail = (email: string) => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return emailRegex.test(email);
+    };
+
+    const pickImage = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets[0]) {
+                setAvatarUri(result.assets[0].uri);
+            }
+        } catch (err) {
+            Alert.alert('Error', 'No pudimos acceder a tu galería de fotos');
+        }
+    };
+
+    const removeAvatar = () => {
+        setAvatarUri(null);
     };
 
     const handleRegister = async () => {
@@ -228,19 +313,46 @@ export default function RegisterScreen() {
         try {
             clearError();
             console.log('Iniciando registro desde pantalla con email:', email);
-            await register(email, password, firstName, lastName, phone || undefined);
+            const registrationToken = await register(email, password, firstName, lastName, phone || undefined);
+
             // El registro fue exitoso y el usuario ya está logueado
+            // Si el usuario seleccionó un avatar, subirlo ahora
+            if (avatarUri && registrationToken) {
+                try {
+                    setUploading(true);
+                    console.log('📤 Subiendo avatar después del registro...');
+                    const uploadResponse = await uploadService.uploadAvatar(avatarUri, registrationToken);
+                    console.log('✅ Avatar subido exitosamente');
+
+                    // Actualizar el usuario en el contexto con el avatar
+                    await updateUser({
+                        ...uploadResponse.user,
+                        role: 'user',
+                        createdAt: new Date().toISOString(),
+                    });
+                    Alert.alert('Éxito', 'Cuenta creada y avatar subido exitosamente');
+                } catch (uploadErr: any) {
+                    console.error('⚠️ Error al subir avatar:', uploadErr.message);
+                    // No fallamos el registro si la foto falla, pero notificamos al usuario
+                    Alert.alert('Registro exitoso', 'Tu cuenta se creó correctamente, pero no pudimos subir tu foto. Puedes intentarlo después desde tu perfil.');
+                }
+            } else {
+                Alert.alert('Éxito', 'Tu cuenta ha sido creada exitosamente');
+            }
+
             // El navegador se encargará de redirigir a home
             console.log('Registro completado, esperando redirección...');
         } catch (err: any) {
             console.error('Error capturado en register.tsx:', err);
             Alert.alert("Error de Registro", error || "No pudimos crear la cuenta. Por favor intenta de nuevo.");
+        } finally {
+            setUploading(false);
         }
     };
 
     return (
         <SafeAreaView style={styles.safeContainer}>
-            <ScrollView 
+            <ScrollView
                 contentContainerStyle={styles.scrollContainer}
                 showsVerticalScrollIndicator={false}
             >
@@ -250,7 +362,7 @@ export default function RegisterScreen() {
                         <View style={styles.logoContainer}>
                             <Text style={styles.logoText}>🏡</Text>
                         </View>
-                        <Text style={styles.appName}>Homi</Text>
+                        <Text style={styles.appName}>Ho-My</Text>
                     </View>
 
                     {/* Header Section */}
@@ -265,6 +377,37 @@ export default function RegisterScreen() {
 
                     {/* Form Container */}
                     <View style={styles.formContainer}>
+                        {/* Avatar Section */}
+                        <View style={styles.avatarSection}>
+                            <Text style={styles.avatarLabel}>Foto de Perfil (Opcional)</Text>
+                            <View style={styles.avatarContainer}>
+                                {avatarUri ? (
+                                    <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+                                ) : (
+                                    <MaterialCommunityIcons name="camera-plus" size={40} color="#3b82f6" />
+                                )}
+                            </View>
+                            <TouchableOpacity
+                                onPress={pickImage}
+                                disabled={isLoading || uploading}
+                                style={styles.selectPhotoBtn}
+                            >
+                                <MaterialCommunityIcons name="image-plus" size={18} color="#3b82f6" />
+                                <Text style={styles.selectPhotoBtnText}>
+                                    {avatarUri ? 'Cambiar Foto' : 'Seleccionar Foto'}
+                                </Text>
+                            </TouchableOpacity>
+                            {avatarUri && (
+                                <TouchableOpacity
+                                    onPress={removeAvatar}
+                                    disabled={isLoading || uploading}
+                                    style={styles.removePhotoBtn}
+                                >
+                                    <Text style={styles.removePhotoBtnText}>Eliminar Foto</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
                         {/* Error Message */}
                         {error && (
                             <Text style={styles.errorText}>⚠️ {error}</Text>

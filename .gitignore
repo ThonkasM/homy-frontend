@@ -9,6 +9,11 @@ dist/
 web-build/
 expo-env.d.ts
 
+# Editor swap files
+*.swp
+*.swo
+*~
+
 # Native
 .kotlin/
 *.orig.*

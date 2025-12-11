@@ -1,9 +1,12 @@
 import { useAuth } from '@/context/auth-context';
 import { Property, useProperties } from '@/hooks/use-properties';
 import { SERVER_BASE_URL } from '@/services/api';
+import { uploadService } from '@/services/upload-service';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const createStyles = (width: number) => {
@@ -51,6 +54,31 @@ const createStyles = (width: number) => {
       textAlign: 'center',
       textAlignVertical: 'center',
       lineHeight: 80,
+      position: 'relative',
+    },
+    profileAvatarImage: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      borderWidth: 3,
+      borderColor: 'rgba(255, 255, 255, 0.4)',
+    },
+    avatarContainer: {
+      position: 'relative',
+    },
+    avatarEditBadge: {
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      backgroundColor: '#ffffff',
+      borderRadius: 16,
+      width: 32,
+      height: 32,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: '#5585b5',
     },
     profileInfo: {
       flex: 1,
@@ -150,25 +178,33 @@ const createStyles = (width: number) => {
       fontWeight: '500',
     },
     gridContainer: {
-      paddingHorizontal: 16,
-      paddingVertical: 16,
+      paddingHorizontal: 1,
+      paddingVertical: 1,
     },
     propertyCard: {
       width: '100%',
-      marginVertical: 12,
-      borderRadius: 16,
+      marginVertical: 8,
+      borderRadius: 12,
       overflow: 'hidden',
       backgroundColor: '#ffffff',
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.08,
-      shadowRadius: 4,
-      elevation: 3,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 3,
+      elevation: 2,
+      borderWidth: 1,
+      borderColor: '#e5e7eb',
     },
     propertyImageContainer: {
-      height: 300,
-      position: 'relative',
-      width: '100%',
+      height: 80,
+      width: 80,
+      borderRadius: 8,
+      marginRight: 16,
+      overflow: 'hidden',
       backgroundColor: '#f1f5f9',
     },
     propertyImage: {
@@ -176,69 +212,90 @@ const createStyles = (width: number) => {
       height: '100%',
       backgroundColor: '#f1f5f9',
     },
-    imageOverlay: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      justifyContent: 'flex-end',
-      paddingHorizontal: 16,
-      paddingVertical: 20,
-      backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    },
-    propertyOverlayContent: {
-      justifyContent: 'flex-end',
-    },
-    propertyPrice: {
-      fontSize: 28,
-      fontWeight: '800',
-      color: '#ffffff',
-      marginBottom: 8,
-      textShadowColor: 'rgba(0, 0, 0, 0.5)',
-      textShadowOffset: { width: 1, height: 1 },
-      textShadowRadius: 3,
+    propertyInfo: {
+      flex: 1,
+      justifyContent: 'space-between',
     },
     propertyTitle: {
-      fontSize: 16,
+      fontSize: 15,
       fontWeight: '600',
-      color: '#ffffff',
+      color: '#0f172a',
       marginBottom: 6,
-      lineHeight: 22,
-      textShadowColor: 'rgba(0, 0, 0, 0.4)',
-      textShadowOffset: { width: 1, height: 1 },
-      textShadowRadius: 2,
+    },
+    propertyPriceRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    propertyPrice: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: '#5585b5',
+    },
+    propertyOptionsButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginLeft: 12,
+    },
+    imageOverlay: {
+      display: 'none',
+    },
+    propertyOverlayContent: {
+      display: 'none',
     },
     propertyMeta: {
-      fontSize: 13,
-      color: '#e2e8f0',
-      fontWeight: '500',
+      fontSize: 12,
+      color: '#64748b',
+      fontWeight: '400',
     },
     actionButtons: {
-      flexDirection: 'row',
-      gap: 12,
-      marginTop: 16,
-      paddingHorizontal: 16,
-      paddingBottom: 12,
+      display: 'none',
     },
     editButton: {
-      flex: 1,
-      backgroundColor: '#5585b5',
-      borderRadius: 8,
-      paddingVertical: 12,
-      alignItems: 'center',
+      display: 'none',
     },
     deleteButton: {
-      flex: 1,
-      backgroundColor: '#dc2626',
-      borderRadius: 8,
-      paddingVertical: 12,
-      alignItems: 'center',
+      display: 'none',
     },
     buttonText: {
-      color: '#ffffff',
-      fontSize: 14,
+      display: 'none',
+    },
+    modalContainer: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      backgroundColor: '#ffffff',
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      paddingVertical: 20,
+      paddingHorizontal: 20,
+    },
+    modalOption: {
+      paddingVertical: 16,
+      paddingHorizontal: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: '#e5e7eb',
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    modalOptionLast: {
+      borderBottomWidth: 0,
+    },
+    modalOptionText: {
+      fontSize: 16,
       fontWeight: '600',
+      marginLeft: 12,
+    },
+    modalOptionEdit: {
+      color: '#5585b5',
+    },
+    modalOptionDelete: {
+      color: '#dc2626',
     },
     emptyContainer: {
       flex: 1,
@@ -274,16 +331,39 @@ const createStyles = (width: number) => {
 };
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, token, updateUser } = useAuth();
   const { properties, loading, error, fetchUserProperties, deleteProperty } = useProperties();
   const { width } = useWindowDimensions();
   const styles = createStyles(width);
   const router = useRouter();
   const searchParams = useLocalSearchParams();
   const [refreshing, setRefreshing] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  useEffect(() => {
+  const buildAvatarUrl = (avatarPath: string | undefined) => {
+    if (!avatarPath) {
+      console.log('[buildAvatarUrl] Avatar path is empty or undefined');
+      return null;
+    }
+
+    if (avatarPath.startsWith('http')) {
+      console.log('[buildAvatarUrl] Avatar is already a full URL:', avatarPath);
+      return avatarPath;
+    }
+
+    const cleanPath = avatarPath.startsWith('/') ? avatarPath : `/${avatarPath}`;
+    const fullUrl = `${SERVER_BASE_URL}${cleanPath}`;
+    console.log('[buildAvatarUrl] Built avatar URL:', {
+      originalPath: avatarPath,
+      cleanPath,
+      fullUrl,
+      SERVER_BASE_URL,
+    });
+    return fullUrl;
+  }; useEffect(() => {
     loadUserProperties();
     // Si viene del crear post, hacer refresh automático
     if (searchParams.refresh === 'true') {
@@ -299,13 +379,76 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleRefresh = async () => {
+  const pickAndUploadAvatar = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setUploadingAvatar(true);
+
+        if (!token) {
+          throw new Error('No hay sesión activa');
+        }
+
+        console.log('📤 Subiendo nuevo avatar...');
+        const uploadResponse = await uploadService.uploadAvatar(result.assets[0].uri, token);
+        console.log('✅ Avatar subido exitosamente');
+
+        // Actualizar el usuario en el contexto
+        await updateUser({
+          ...uploadResponse.user,
+          role: user?.role || 'user',
+          createdAt: user?.createdAt || new Date().toISOString(),
+        });
+
+        Alert.alert('Éxito', 'Foto de perfil actualizada');
+      }
+    } catch (err: any) {
+      console.error('Error al actualizar avatar:', err.message);
+      Alert.alert('Error', 'No pudimos actualizar tu foto de perfil: ' + err.message);
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }; const handleRefresh = async () => {
     setRefreshing(true);
     try {
+      // Recargar usuario del contexto (incluye avatar actualizado)
+      if (user && token) {
+        try {
+          const response = await fetch(`${SERVER_BASE_URL}/api/auth/profile`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (response.ok) {
+            const data = await response.json();
+            console.log('📥 Respuesta del perfil:', JSON.stringify(data, null, 2));
+
+            // El endpoint puede devolver { user: {...} } o solo {...}
+            const updatedUser = data.user || data;
+
+            if (updatedUser && updatedUser.email) {
+              await updateUser(updatedUser);
+              console.log('✅ Usuario actualizado:', updatedUser.email);
+            } else {
+              console.warn('⚠️ Respuesta incompleta del perfil:', data);
+            }
+          } else {
+            console.error('❌ Error HTTP:', response.status);
+          }
+        } catch (err) {
+          console.error('Error reloading user:', err);
+        }
+      }
+
+      // Recargar propiedades
       await loadUserProperties();
-      console.log('✅ Perfil actualizado');
+      console.log('✅ Perfil actualizado completamente');
     } catch (err) {
-      console.error('Error refreshing properties:', err);
+      console.error('Error refreshing profile:', err);
     } finally {
       setRefreshing(false);
     }
@@ -375,8 +518,14 @@ export default function ProfileScreen() {
       });
     };
 
+    const openOptionsModal = () => {
+      setSelectedProperty(property);
+      setModalVisible(true);
+    };
+
     return (
       <View key={property.id} style={styles.propertyCard}>
+        {/* Imagen */}
         <View style={styles.propertyImageContainer}>
           {fullImageUrl ? (
             <Image
@@ -386,40 +535,28 @@ export default function ProfileScreen() {
             />
           ) : (
             <View style={[styles.propertyImage, { justifyContent: 'center', alignItems: 'center' }]}>
-              <Text style={{ color: '#cbd5e1', fontSize: 16 }}>📷 Sin imagen</Text>
+              <Text style={{ color: '#cbd5e1', fontSize: 16 }}>📷</Text>
             </View>
           )}
-
-          <View style={styles.imageOverlay}>
-            <View style={styles.propertyOverlayContent}>
-              <Text style={styles.propertyPrice}>
-                ${property.price.toLocaleString()}
-              </Text>
-              <Text style={styles.propertyTitle} numberOfLines={1}>
-                {property.title}
-              </Text>
-              <Text style={styles.propertyMeta} numberOfLines={1}>
-                📍 {property.address}
-              </Text>
-            </View>
-          </View>
         </View>
 
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => handleEditProperty(property.id)}
-          >
-            <Text style={styles.buttonText}>Editar</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => handleDeleteProperty(property.id, property.title)}
-          >
-            <Text style={styles.buttonText}>Eliminar</Text>
-          </TouchableOpacity>
+        {/* Información */}
+        <View style={styles.propertyInfo}>
+          <Text style={styles.propertyTitle} numberOfLines={1}>
+            {property.title}
+          </Text>
+          <Text style={styles.propertyPrice}>
+            ${property.price.toLocaleString()}
+          </Text>
         </View>
+
+        {/* Botón de opciones */}
+        <TouchableOpacity
+          style={styles.propertyOptionsButton}
+          onPress={openOptionsModal}
+        >
+          <MaterialCommunityIcons name="dots-vertical" size={24} color="#5585b5" />
+        </TouchableOpacity>
       </View>
     );
   };
@@ -441,7 +578,42 @@ export default function ProfileScreen() {
         {/* Profile Header */}
         <View style={styles.profileHeader}>
           <View style={styles.profileHeaderTop}>
-            <Text style={styles.profileAvatar}>{user?.avatar || '👤'}</Text>
+            <TouchableOpacity
+              style={styles.avatarContainer}
+              onPress={pickAndUploadAvatar}
+              disabled={uploadingAvatar}
+            >
+              {user?.avatar ? (
+                buildAvatarUrl(user.avatar) ? (
+                  <Image
+                    key={`${user.avatar}`}
+                    source={{ uri: buildAvatarUrl(user.avatar)! }}
+                    style={styles.profileAvatarImage}
+                    onError={(e) => {
+                      console.error('❌ Avatar Image load error:', {
+                        originalAvatar: user?.avatar,
+                        builtUrl: buildAvatarUrl(user.avatar),
+                        error: e.nativeEvent.error,
+                      });
+                    }}
+                    onLoad={() => {
+                      console.log('✅ Avatar Image loaded successfully:', buildAvatarUrl(user.avatar));
+                    }}
+                  />
+                ) : (
+                  <Text style={styles.profileAvatar}>{user.avatar}</Text>
+                )
+              ) : (
+                <Text style={styles.profileAvatar}>👤</Text>
+              )}
+              <View style={styles.avatarEditBadge}>
+                {uploadingAvatar ? (
+                  <ActivityIndicator size="small" color="#5585b5" />
+                ) : (
+                  <MaterialCommunityIcons name="camera" size={16} color="#5585b5" />
+                )}
+              </View>
+            </TouchableOpacity>
             <View style={styles.profileInfo}>
               <Text style={styles.profileName}>
                 {user?.firstName || 'Usuario'} {user?.lastName || ''}
@@ -505,6 +677,50 @@ export default function ProfileScreen() {
           <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Modal de opciones */}
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalContainer}
+          activeOpacity={1}
+          onPress={() => setModalVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            {/* Opción Editar */}
+            <TouchableOpacity
+              style={styles.modalOption}
+              onPress={() => {
+                if (selectedProperty) {
+                  setModalVisible(false);
+                  handleEditProperty(selectedProperty.id);
+                }
+              }}
+            >
+              <MaterialCommunityIcons name="pencil" size={24} color="#5585b5" />
+              <Text style={[styles.modalOptionText, styles.modalOptionEdit]}>Editar</Text>
+            </TouchableOpacity>
+
+            {/* Opción Eliminar */}
+            <TouchableOpacity
+              style={[styles.modalOption, styles.modalOptionLast]}
+              onPress={() => {
+                if (selectedProperty) {
+                  setModalVisible(false);
+                  handleDeleteProperty(selectedProperty.id, selectedProperty.title);
+                }
+              }}
+            >
+              <MaterialCommunityIcons name="trash-can" size={24} color="#dc2626" />
+              <Text style={[styles.modalOptionText, styles.modalOptionDelete]}>Eliminar</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }

@@ -240,7 +240,7 @@ export default function LoginScreen() {
                         <View style={styles.logoContainer}>
                             <Text style={styles.logoText}>🏡</Text>
                         </View>
-                        <Text style={styles.appName}>Homi</Text>
+                        <Text style={styles.appName}>Ho-My</Text>
                     </View>
 
                     {/* Header Section */}

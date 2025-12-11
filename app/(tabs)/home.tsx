@@ -1,3 +1,4 @@
+import { useAuth } from '@/context/auth-context';
 import { Property, useProperties } from '@/hooks/use-properties';
 import { SERVER_BASE_URL } from '@/services/api';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -36,6 +37,9 @@ const PropertyCard = ({
   onOpenMap,
   onOpenWhatsApp,
   onShare,
+  userAvatar,
+  userName,
+  isMobile,
 }: {
   property: Property;
   styles: any;
@@ -45,9 +49,13 @@ const PropertyCard = ({
   onOpenMap: (p: Property, e: any) => void;
   onOpenWhatsApp: (p: Property, e: any) => void;
   onShare: (p: Property, e: any) => void;
+  userAvatar?: string;
+  userName?: string;
+  isMobile: boolean;
 }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const imageUrl = property.images?.[0]?.url;
+  const iconSize = isMobile ? 16 : 20;
 
   const handleHeartPress = (propertyId: string, e: any) => {
     e.stopPropagation();
@@ -78,7 +86,15 @@ const PropertyCard = ({
     return `${SERVER_BASE_URL}${cleanPath}`;
   };
 
+  const buildAvatarUrl = (avatarPath: string | undefined) => {
+    if (!avatarPath) return null;
+    if (avatarPath.startsWith('http')) return avatarPath;
+    const cleanPath = avatarPath.startsWith('/') ? avatarPath : `/${avatarPath}`;
+    return `${SERVER_BASE_URL}${cleanPath}`;
+  };
+
   const fullImageUrl = buildImageUrl(imageUrl);
+  const fullAvatarUrl = buildAvatarUrl(userAvatar);
 
   return (
     <View key={property.id} style={styles.propertyCard}>
@@ -107,6 +123,26 @@ const PropertyCard = ({
 
         {/* Overlay con información superpuesta */}
         <View style={styles.imageOverlay}>
+          {/* Usuario info en la esquina superior izquierda */}
+          {(userAvatar || userName) && (
+            <View style={styles.userInfoOverlay}>
+              {fullAvatarUrl ? (
+                <Image
+                  source={{ uri: fullAvatarUrl }}
+                  style={styles.userAvatarImage}
+                  onError={() => {
+                    console.error('❌ Avatar load error:', fullAvatarUrl);
+                  }}
+                />
+              ) : userAvatar ? (
+                <Text style={styles.userAvatarEmoji}>{userAvatar}</Text>
+              ) : (
+                <Text style={styles.userAvatarEmoji}>👤</Text>
+              )}
+              {userName && <Text style={styles.userName} numberOfLines={1}>{userName}</Text>}
+            </View>
+          )}
+
           {/* Botón de corazón con animación */}
           <Animated.View
             style={[
@@ -150,7 +186,7 @@ const PropertyCard = ({
           style={[styles.actionButton, styles.actionButtonMapStyle]}
           onPress={(e) => onOpenMap(property, e)}
         >
-          <MaterialCommunityIcons name="map-marker-radius" size={24} color="#ffffff" />
+          <MaterialCommunityIcons name="map-marker-radius" size={iconSize} color="#ffffff" />
           <Text style={styles.actionButtonText}>Ubicación</Text>
         </Pressable>
 
@@ -159,7 +195,7 @@ const PropertyCard = ({
           style={[styles.actionButton, styles.actionButtonChatStyle]}
           onPress={(e) => onOpenWhatsApp(property, e)}
         >
-          <MaterialCommunityIcons name="message-text-outline" size={24} color="#ffffff" />
+          <MaterialCommunityIcons name="message-text-outline" size={iconSize} color="#ffffff" />
           <Text style={styles.actionButtonText}>Consultar</Text>
         </Pressable>
 
@@ -168,7 +204,7 @@ const PropertyCard = ({
           style={[styles.actionButton, styles.actionButtonShareStyle]}
           onPress={(e) => onShare(property, e)}
         >
-          <MaterialCommunityIcons name="share-all" size={24} color="#ffffff" />
+          <MaterialCommunityIcons name="share-all" size={iconSize} color="#ffffff" />
           <Text style={styles.actionButtonText}>Compartir</Text>
         </Pressable>
       </View>
@@ -327,6 +363,44 @@ const createStyles = (width: number) => {
       marginTop: 8,
       lineHeight: 18,
     },
+    // Usuario info sobre la imagen
+    userInfoOverlay: {
+      position: 'absolute',
+      top: 16,
+      left: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      zIndex: 5,
+      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+      borderRadius: 20,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    userAvatar: {
+      fontSize: 24,
+      marginRight: 8,
+    },
+    userAvatarImage: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      marginRight: 8,
+      backgroundColor: '#e2e8f0',
+    },
+    userAvatarEmoji: {
+      fontSize: 20,
+      marginRight: 8,
+    },
+    userName: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#0f172a',
+    },
     // Estados de carga y error
     loadingContainer: {
       flex: 1,
@@ -397,9 +471,9 @@ const createStyles = (width: number) => {
     },
     actionButtons: {
       flexDirection: 'row',
-      paddingHorizontal: 16,
-      paddingVertical: 20,
-      gap: 12,
+      paddingHorizontal: isMobile ? 12 : 16,
+      paddingVertical: isMobile ? 12 : 20,
+      gap: isMobile ? 8 : 12,
       justifyContent: 'space-between',
       backgroundColor: '#ffffff',
       borderTopWidth: 2,
@@ -407,12 +481,13 @@ const createStyles = (width: number) => {
     },
     actionButton: {
       flex: 1,
-      paddingVertical: 16,
-      paddingHorizontal: 12,
+      paddingVertical: isMobile ? 10 : 14,
+      paddingHorizontal: isMobile ? 8 : 12,
       borderRadius: 12,
       justifyContent: 'center',
       alignItems: 'center',
-      gap: 8,
+      gap: isMobile ? 4 : 8,
+      flexDirection: 'row',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.08,
@@ -429,17 +504,19 @@ const createStyles = (width: number) => {
       backgroundColor: '#79c2d0',
     },
     actionButtonText: {
-      fontSize: 13,
+      fontSize: isMobile ? 11 : 13,
       fontWeight: '600',
       textAlign: 'center',
       color: '#ffffff',
       letterSpacing: 0.3,
+      marginLeft: isMobile ? 2 : 4,
     },
   });
 };
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const { properties, loading, error, fetchProperties } = useProperties();
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -616,6 +693,9 @@ ${deepLink}`;
         onOpenMap={handleOpenMap}
         onOpenWhatsApp={handleOpenWhatsApp}
         onShare={handleShare}
+        userAvatar={property.owner?.avatar}
+        userName={`${property.owner?.firstName} ${property.owner?.lastName}`}
+        isMobile={isMobile}
       />
     );
   };
@@ -626,7 +706,7 @@ ${deepLink}`;
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.headerContainer}>
-          <Text style={styles.headerTitle}>Homy</Text>
+          <Text style={styles.headerTitle}>Ho-My</Text>
 
           <View style={styles.searchContainer}>
             <Text style={styles.searchIcon}>🔍</Text>

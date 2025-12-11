@@ -294,6 +294,13 @@ const createStyles = (screenWidth: number) => {
       fontSize: 36,
       marginRight: 12,
     },
+    contactAvatarImage: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      marginRight: 12,
+      backgroundColor: '#e2e8f0',
+    },
     contactInfo: {
       flex: 1,
     },
@@ -812,6 +819,14 @@ export default function PropertyDetailScreen() {
     }
   };
 
+  // Construir URLs completas de avatares
+  const buildAvatarUrl = (avatarPath: string | undefined) => {
+    if (!avatarPath) return null;
+    if (avatarPath.startsWith('http')) return avatarPath;
+    const cleanPath = avatarPath.startsWith('/') ? avatarPath : `/${avatarPath}`;
+    return `${SERVER_BASE_URL}${cleanPath}`;
+  };
+
   // Construir URLs completas de imágenes
   const propertyImages = (property.images || []).map((img: any) => {
     const finalUrl = img.url?.startsWith('http')
@@ -1014,9 +1029,19 @@ export default function PropertyDetailScreen() {
             {/* Contact Card */}
             <View style={styles.cardBlueLight}>
               <View style={styles.contactHeader}>
-                <Text style={styles.contactAvatar}>
-                  {property.owner?.avatar || '👤'}
-                </Text>
+                {buildAvatarUrl(property.owner?.avatar) ? (
+                  <Image
+                    source={{ uri: buildAvatarUrl(property.owner?.avatar)! }}
+                    style={styles.contactAvatarImage}
+                    onError={() => {
+                      console.error('❌ Avatar load error:', property.owner?.avatar);
+                    }}
+                  />
+                ) : (
+                  <Text style={styles.contactAvatar}>
+                    {property.owner?.avatar || '👤'}
+                  </Text>
+                )}
                 <View style={styles.contactInfo}>
                   <Text style={styles.contactName}>
                     {property.owner?.firstName} {property.owner?.lastName}

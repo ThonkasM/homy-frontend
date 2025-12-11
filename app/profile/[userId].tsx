@@ -151,6 +151,14 @@ const createStyles = (screenWidth: number) => {
             textAlignVertical: 'center',
             lineHeight: 80,
         },
+        profileAvatarImage: {
+            width: 80,
+            height: 80,
+            borderRadius: 40,
+            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+            borderWidth: 3,
+            borderColor: 'rgba(255, 255, 255, 0.4)',
+        },
         profileInfo: {
             flex: 1,
             justifyContent: 'center',
@@ -349,6 +357,28 @@ export default function PublicProfileScreen() {
         loadProperties(1);
     }, [userId]);
 
+    const buildAvatarUrl = (avatarPath: string | undefined) => {
+        if (!avatarPath) {
+            console.log('[buildAvatarUrl] Avatar path is empty or undefined');
+            return null;
+        }
+
+        if (avatarPath.startsWith('http')) {
+            console.log('[buildAvatarUrl] Avatar is already a full URL:', avatarPath);
+            return avatarPath;
+        }
+
+        const cleanPath = avatarPath.startsWith('/') ? avatarPath : `/${avatarPath}`;
+        const fullUrl = `${SERVER_BASE_URL}${cleanPath}`;
+        console.log('[buildAvatarUrl] Built avatar URL:', {
+            originalPath: avatarPath,
+            cleanPath,
+            fullUrl,
+            SERVER_BASE_URL,
+        });
+        return fullUrl;
+    };
+
     const loadProfile = async () => {
         try {
             const profile = await apiService.getUserPublicProfile(userId);
@@ -474,7 +504,28 @@ export default function PublicProfileScreen() {
                 {userProfile && (
                     <View style={styles.profileHeader}>
                         <View style={styles.profileHeaderTop}>
-                            <Text style={styles.profileAvatar}>{userProfile.avatar || '👤'}</Text>
+                            {userProfile.avatar ? (
+                                buildAvatarUrl(userProfile.avatar) ? (
+                                    <Image
+                                        source={{ uri: buildAvatarUrl(userProfile.avatar)! }}
+                                        style={styles.profileAvatarImage}
+                                        onError={(e) => {
+                                            console.error('❌ Avatar load error:', {
+                                                originalAvatar: userProfile.avatar,
+                                                builtUrl: buildAvatarUrl(userProfile.avatar),
+                                                error: e.nativeEvent.error,
+                                            });
+                                        }}
+                                        onLoad={() => {
+                                            console.log('✅ Avatar loaded successfully:', buildAvatarUrl(userProfile.avatar));
+                                        }}
+                                    />
+                                ) : (
+                                    <Text style={styles.profileAvatar}>{userProfile.avatar}</Text>
+                                )
+                            ) : (
+                                <Text style={styles.profileAvatar}>👤</Text>
+                            )}
                             <View style={styles.profileInfo}>
                                 <Text style={styles.profileName}>
                                     {userProfile.firstName} {userProfile.lastName}
