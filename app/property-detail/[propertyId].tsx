@@ -1,3 +1,6 @@
+import { formatPriceWithCurrency } from '@/config/currencies.config';
+import { PROPERTY_TYPES_CONFIG } from '@/config/property-types.config';
+import { useFavoritesContext } from '@/context/favorites-context';
 import { Property } from '@/hooks/use-properties';
 import { apiService, SERVER_BASE_URL } from '@/services/api';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -564,14 +567,17 @@ export default function PropertyDetailScreen() {
   const router = useRouter();
   const { propertyId } = useLocalSearchParams() as { propertyId: string };
   const scrollViewRef = useRef<ScrollView>(null);
+  const { favorites, fetchFavorites, addFavorite, removeFavorite } = useFavoritesContext();
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [isLiked, setIsLiked] = useState(false);
   const [fullscreenImageIndex, setFullscreenImageIndex] = useState<number | null>(null);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [scrollOffset, setScrollOffset] = useState(0);
+
+  // Derived state: check if property is favorited
+  const isLiked = favorites.some(fav => fav.propertyId === propertyId);
 
   // Límite de caracteres para descripción truncada
   const DESCRIPTION_LIMIT = 150;
@@ -591,6 +597,7 @@ export default function PropertyDetailScreen() {
 
   useEffect(() => {
     loadProperty();
+    loadFavorites();
   }, [propertyId]);
 
   const loadProperty = async () => {
@@ -614,9 +621,18 @@ export default function PropertyDetailScreen() {
     }
   };
 
+  const loadFavorites = async () => {
+    try {
+      console.log('[PropertyDetail] Cargando favoritos...');
+      await fetchFavorites();
+    } catch (err) {
+      console.error('[PropertyDetail] Error cargando favoritos:', err);
+    }
+  };
+
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  const handleLike = () => {
+  const handleLike = async () => {
     // Animación de escala y rebote
     Animated.sequence([
       Animated.spring(scaleAnim, {
@@ -633,7 +649,31 @@ export default function PropertyDetailScreen() {
       }),
     ]).start();
 
-    setIsLiked(!isLiked);
+    try {
+      if (isLiked) {
+        // Remove from favorites
+        console.log('[PropertyDetail] Removiendo de favoritos:', propertyId);
+        await removeFavorite(propertyId);
+      } else {
+        // Add to favorites
+        console.log('[PropertyDetail] Añadiendo a favoritos:', propertyId);
+        await addFavorite(propertyId);
+      }
+    } catch (err: any) {
+      console.error('[PropertyDetail] Error al actualizar favoritos:', err);
+
+      // Extraer mensaje de error del response
+      let errorMessage = 'No se pudo actualizar los favoritos';
+      if (err.message) {
+        errorMessage = err.message;
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      }
+
+      Alert.alert('⚠️ Error', errorMessage);
+    }
   };
 
   if (loading) {
@@ -1007,7 +1047,7 @@ export default function PropertyDetailScreen() {
 
               <View style={styles.priceLocationRow}>
 
-                <Text style={styles.price}>${property.price.toLocaleString()}</Text>
+                <Text style={styles.price}>{formatPriceWithCurrency(property.price, property.currency || 'BOB')}</Text>
                 {/* Ubicación Clickeable */}
                 <TouchableOpacity
                   style={styles.locationButton}
@@ -1104,8 +1144,53 @@ export default function PropertyDetailScreen() {
               })()}
             </View>
 
-            {/* Features Card */}
-            {(property.bedrooms !== undefined || property.bathrooms !== undefined || property.area !== undefined) && (
+            {/* Features Card - Dinámicas basadas en specifications */}
+            {property.specifications && Object.keys(property.specifications).length > 0 ? (
+              <View style={styles.cardHeaderSection}>
+                <View style={styles.sectionFeatures}>
+                  <Text style={styles.sectionTitle}>Características</Text>
+                  <View style={styles.featureGrid}>
+                    {Object.entries(property.specifications).map(([key, value]) => {
+                      // Obtener la configuración del campo desde el config
+                      const config = PROPERTY_TYPES_CONFIG[property.propertyType];
+                      const fieldConfig = config?.fields.find((f) => f.key === key);
+                      const label = fieldConfig?.label || key;
+                      const unit = fieldConfig?.unit || '';
+
+                      // No renderizar si el valor es null, undefined o vacío
+                      if (value === null || value === undefined || value === '') return null;
+
+                      // Para booleanos
+                      if (typeof value === 'boolean') {
+                        return value ? (
+                          <View key={key} style={styles.featureCard}>
+                            <MaterialCommunityIcons name="check-circle" size={20} color="#10b981" />
+                            <View>
+                              <Text style={[styles.featureLabel, { color: '#10b981' }]}>{label}</Text>
+                            </View>
+                          </View>
+                        ) : null;
+                      }
+
+                      return (
+                        <View key={key} style={styles.featureCard}>
+                          <MaterialCommunityIcons name="information" size={20} color="#5585b5" />
+                          <View>
+                            <Text style={styles.featureValue}>
+                              {typeof value === 'number' ? value.toFixed(0) : value}
+                            </Text>
+                            <Text style={styles.featureLabel}>
+                              {unit ? `${label} (${unit})` : label}
+                            </Text>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              </View>
+            ) : (property.bedrooms !== undefined || property.bathrooms !== undefined || property.area !== undefined) ? (
+              // Fallback a datos legacy si no hay specifications
               <View style={styles.cardHeaderSection}>
                 <View style={styles.sectionFeatures}>
                   <Text style={styles.sectionTitle}>Características</Text>
@@ -1149,23 +1234,30 @@ export default function PropertyDetailScreen() {
                   </View>
                 </View>
               </View>
-            )}
+            ) : null}
 
-
-
-            {/* Amenities Card */}
+            {/* Amenities Card - Ahora con etiquetas descriptivas */}
             {property.amenities && property.amenities.length > 0 && (
               <View style={styles.cardWhite}>
                 <Text style={styles.sectionTitle}>Amenidades</Text>
                 <View style={styles.amenitiesList}>
-                  {property.amenities.map((amenity: string, index: number) => (
-                    <View key={index} style={styles.amenityTag}>
-                      <Text style={styles.amenityText}>{amenity}</Text>
-                    </View>
-                  ))}
+                  {property.amenities.map((amenityId: string, index: number) => {
+                    // Obtener la etiqueta desde el config
+                    const config = PROPERTY_TYPES_CONFIG[property.propertyType];
+                    const amenityConfig = config?.amenities.find((a) => a.id === amenityId);
+                    const amenityLabel = amenityConfig?.label || amenityId;
+
+                    return (
+                      <View key={index} style={styles.amenityTag}>
+                        <MaterialCommunityIcons name="check" size={14} color="#5585b5" />
+                        <Text style={styles.amenityText}>{amenityLabel}</Text>
+                      </View>
+                    );
+                  })}
                 </View>
               </View>
             )}
+
 
 
           </View>

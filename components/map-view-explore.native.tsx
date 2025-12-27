@@ -1,3 +1,4 @@
+import { formatPriceWithCurrency } from '@/config/currencies.config';
 import { SERVER_BASE_URL } from '@/services/api';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
@@ -184,7 +185,7 @@ function MapViewExploreMobile({
                                     📍 {selectedProperty.address}
                                 </Text>
                                 <Text style={styles.cardPrice}>
-                                    ${selectedProperty.price.toLocaleString()}
+                                    {formatPriceWithCurrency(selectedProperty.price, selectedProperty.currency || 'BOB')}
                                 </Text>
                             </View>
                         </View>

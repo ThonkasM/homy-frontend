@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 
 import SplashScreen from '@/components/splash-screen';
 import { AuthProvider, useAuth } from '@/context/auth-context';
+import { FavoritesProvider } from '@/context/favorites-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useDeepLinkHandler } from '@/hooks/use-deep-link-handler';
 
@@ -71,7 +72,9 @@ function RootLayoutNav() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootLayoutNav />
+      <FavoritesProvider>
+        <RootLayoutNav />
+      </FavoritesProvider>
     </AuthProvider>
   );
 }

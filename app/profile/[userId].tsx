@@ -1,3 +1,4 @@
+import { formatPriceWithCurrency } from '@/config/currencies.config';
 import { apiService, SERVER_BASE_URL } from '@/services/api';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -34,6 +35,7 @@ interface Property {
     id: string;
     title: string;
     price: number;
+    currency?: string;
     images?: Array<{ id: string; url: string }>;
     propertyType: string;
     city: string;
@@ -581,7 +583,7 @@ export default function PublicProfileScreen() {
                                         <View style={styles.imageOverlay}>
                                             <View style={styles.propertyOverlayContent}>
                                                 <Text style={styles.propertyPrice}>
-                                                    ${item.price.toLocaleString()}
+                                                    {formatPriceWithCurrency(item.price, item.currency || 'BOB')}
                                                 </Text>
                                                 <Text style={styles.propertyTitle} numberOfLines={1}>
                                                     {item.title}

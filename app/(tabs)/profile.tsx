@@ -1,4 +1,6 @@
+import { formatPriceWithCurrency } from '@/config/currencies.config';
 import { useAuth } from '@/context/auth-context';
+import { useFavoritesContext } from '@/context/favorites-context';
 import { Property, useProperties } from '@/hooks/use-properties';
 import { SERVER_BASE_URL } from '@/services/api';
 import { uploadService } from '@/services/upload-service';
@@ -294,8 +296,45 @@ const createStyles = (width: number) => {
     modalOptionEdit: {
       color: '#5585b5',
     },
+    modalOptionArchive: {
+      color: '#f59e0b',
+    },
     modalOptionDelete: {
       color: '#dc2626',
+    },
+    // ============================================
+    // TABS STYLES
+    // ============================================
+    tabsContainer: {
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingVertical: 16,
+      backgroundColor: '#ffffff',
+      borderBottomWidth: 1,
+      borderBottomColor: '#e2e8f0',
+      gap: 8,
+    },
+    tabButton: {
+      flex: 1,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      backgroundColor: '#f1f5f9',
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: 6,
+    },
+    tabButtonActive: {
+      backgroundColor: '#5585b5',
+    },
+    tabText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: '#64748b',
+    },
+    tabTextActive: {
+      color: '#ffffff',
     },
     emptyContainer: {
       flex: 1,
@@ -313,26 +352,83 @@ const createStyles = (width: number) => {
       justifyContent: 'center',
       alignItems: 'center',
     },
-    logoutButton: {
-      backgroundColor: '#dc2626',
-      borderRadius: 10,
-      paddingVertical: 16,
-      alignItems: 'center',
-      marginHorizontal: horizontalPadding,
-      marginBottom: 32,
-      marginTop: 16,
+    // ============================================
+    // MENU MODAL STYLES
+    // ============================================
+    menuModalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'flex-end',
     },
-    logoutButtonText: {
-      color: '#ffffff',
-      fontSize: 16,
+    menuModalContent: {
+      backgroundColor: '#ffffff',
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingHorizontal: 24,
+      paddingTop: 24,
+      paddingBottom: 32,
+      gap: 0,
+    },
+    menuModalHeader: {
+      fontSize: 18,
       fontWeight: '700',
+      color: '#5585b5',
+      marginBottom: 20,
+      textAlign: 'center',
+    },
+    menuOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 14,
+      paddingHorizontal: 12,
+      borderRadius: 12,
+      gap: 12,
+      marginBottom: 8,
+    },
+    menuOptionText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: '#475569',
+      flex: 1,
+    },
+    menuOptionLogout: {
+      marginTop: 12,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: '#e2e8f0',
+    },
+    menuOptionLogoutText: {
+      color: '#dc2626',
+      fontWeight: '700',
+    },
+    menuCloseButton: {
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      backgroundColor: '#f1f5f9',
+      borderRadius: 12,
+      alignItems: 'center',
+      marginTop: 12,
+    },
+    menuCloseButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#64748b',
+    },
+    hamburgerButton: {
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderRadius: 8,
+      backgroundColor: 'rgba(255, 255, 255, 0.15)',
     },
   });
 };
 
 export default function ProfileScreen() {
   const { user, logout, token, updateUser } = useAuth();
-  const { properties, loading, error, fetchUserProperties, deleteProperty } = useProperties();
+  const { properties, loading, error, fetchUserProperties, deleteProperty, archiveProperty } = useProperties();
+  const { favorites, fetchFavorites, removeFavorite } = useFavoritesContext();
   const { width } = useWindowDimensions();
   const styles = createStyles(width);
   const router = useRouter();
@@ -341,6 +437,8 @@ export default function ProfileScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [activeTab, setActiveTab] = useState<'properties' | 'favorites'>('properties');
+  const [showMenu, setShowMenu] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const buildAvatarUrl = (avatarPath: string | undefined) => {
@@ -363,7 +461,16 @@ export default function ProfileScreen() {
       SERVER_BASE_URL,
     });
     return fullUrl;
-  }; useEffect(() => {
+  };
+
+  useEffect(() => {
+    // Cargar favoritos cuando se cambia a la tab de favoritos
+    if (activeTab === 'favorites') {
+      fetchFavorites();
+    }
+  }, [activeTab, fetchFavorites]);
+
+  useEffect(() => {
     loadUserProperties();
     // Si viene del crear post, hacer refresh automático
     if (searchParams.refresh === 'true') {
@@ -427,8 +534,8 @@ export default function ProfileScreen() {
             const data = await response.json();
             console.log('📥 Respuesta del perfil:', JSON.stringify(data, null, 2));
 
-            // El endpoint puede devolver { user: {...} } o solo {...}
-            const updatedUser = data.user || data;
+            // El backend devuelve { data: {...}, success: true, timestamp: "..." }
+            const updatedUser = data.data || data.user || data;
 
             if (updatedUser && updatedUser.email) {
               await updateUser(updatedUser);
@@ -472,6 +579,29 @@ export default function ProfileScreen() {
             }
           },
           style: 'destructive',
+        },
+      ]
+    );
+  };
+
+  const handleArchiveProperty = (propertyId: string, title: string) => {
+    Alert.alert(
+      'Archivar Propiedad',
+      `¿Deseas archivar "${title}"? No será visible públicamente.`,
+      [
+        { text: 'Cancelar', onPress: () => { }, style: 'cancel' },
+        {
+          text: 'Archivar',
+          onPress: async () => {
+            try {
+              await archiveProperty(propertyId);
+              Alert.alert('Éxito', 'Propiedad archivada exitosamente');
+              await loadUserProperties();
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'No se pudo archivar la propiedad');
+            }
+          },
+          style: 'default',
         },
       ]
     );
@@ -546,7 +676,7 @@ export default function ProfileScreen() {
             {property.title}
           </Text>
           <Text style={styles.propertyPrice}>
-            ${property.price.toLocaleString()}
+            {formatPriceWithCurrency(property.price, property.currency || 'BOB')}
           </Text>
         </View>
 
@@ -556,6 +686,72 @@ export default function ProfileScreen() {
           onPress={openOptionsModal}
         >
           <MaterialCommunityIcons name="dots-vertical" size={24} color="#5585b5" />
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderFavoriteCard = (favorite: any) => {
+    const property = favorite.property;
+    const imageUrl = property.images?.[0]?.url;
+    const buildImageUrl = (imagePath: string | undefined) => {
+      if (!imagePath) return null;
+      if (imagePath.startsWith('http')) return imagePath;
+      const cleanPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+      return `${SERVER_BASE_URL}${cleanPath}`;
+    };
+    const fullImageUrl = buildImageUrl(imageUrl);
+
+    const handleRemoveFavorite = async () => {
+      try {
+        await removeFavorite(property.id);
+        Alert.alert('Éxito', 'Removido de favoritos');
+      } catch (err) {
+        Alert.alert('Error', 'No pudimos remover de favoritos');
+      }
+    };
+
+    const handleViewProperty = () => {
+      router.push(`/property-detail/${property.id}`);
+    };
+
+    return (
+      <View key={favorite.id} style={styles.propertyCard}>
+        {/* Imagen */}
+        <View style={styles.propertyImageContainer}>
+          {fullImageUrl ? (
+            <Image
+              source={{ uri: fullImageUrl }}
+              style={styles.propertyImage}
+              onError={() => {
+                console.error('[FavoriteCard] Image load error:', fullImageUrl);
+              }}
+            />
+          ) : (
+            <View style={[styles.propertyImage, { justifyContent: 'center', alignItems: 'center' }]}>
+              <Text style={{ color: '#cbd5e1', fontSize: 16 }}>📷</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Información */}
+        <View style={styles.propertyInfo}>
+          <TouchableOpacity onPress={handleViewProperty}>
+            <Text style={styles.propertyTitle} numberOfLines={1}>
+              {property.title}
+            </Text>
+            <Text style={styles.propertyPrice}>
+              {formatPriceWithCurrency(property.price, property.currency || 'BOB')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Botón Remover de Favoritos */}
+        <TouchableOpacity
+          style={[styles.propertyOptionsButton]}
+          onPress={handleRemoveFavorite}
+        >
+          <MaterialCommunityIcons name="heart" size={24} color="#dc2626" />
         </TouchableOpacity>
       </View>
     );
@@ -621,6 +817,13 @@ export default function ProfileScreen() {
               {user?.email && <Text style={styles.profileEmail}>{user?.email}</Text>}
               {user?.phone && <Text style={styles.profilePhone}>{user?.phone}</Text>}
             </View>
+            {/* Menu Hamburguesa Button */}
+            <TouchableOpacity
+              style={styles.hamburgerButton}
+              onPress={() => setShowMenu(!showMenu)}
+            >
+              <MaterialCommunityIcons name="menu" size={24} color="#ffffff" />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -640,42 +843,103 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* User Properties Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Mis Propiedades</Text>
-            <Text style={styles.propertyCount}>({properties.length})</Text>
-          </View>
+        {/* Tabs */}
+        <View style={styles.tabsContainer}>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'properties' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('properties')}
+          >
+            <MaterialCommunityIcons
+              name="home"
+              size={16}
+              color={activeTab === 'properties' ? '#ffffff' : '#64748b'}
+            />
+            <Text style={[styles.tabText, activeTab === 'properties' && styles.tabTextActive]}>
+              Mis Propiedades
+            </Text>
+          </TouchableOpacity>
 
-          {/* Error Message */}
-          {error && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>⚠️ {error}</Text>
-            </View>
-          )}
-
-          {/* Loading State */}
-          {loading && properties.length === 0 ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#5585b5" />
-              <Text style={styles.emptyText}>Cargando propiedades...</Text>
-            </View>
-          ) : properties.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={{ fontSize: 48 }}>📝</Text>
-              <Text style={styles.emptyText}>No tienes propiedades publicadas</Text>
-            </View>
-          ) : (
-            <View style={styles.gridContainer}>
-              {properties.map((property) => renderPropertyCard(property))}
-            </View>
-          )}
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'favorites' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('favorites')}
+          >
+            <MaterialCommunityIcons
+              name="heart"
+              size={16}
+              color={activeTab === 'favorites' ? '#ffffff' : '#64748b'}
+            />
+            <Text style={[styles.tabText, activeTab === 'favorites' && styles.tabTextActive]}>
+              Favoritos
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Logout Button */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
-        </TouchableOpacity>
+        {/* Content Based on Active Tab */}
+        {activeTab === 'properties' ? (
+          // MIS PROPIEDADES TAB
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Mis Propiedades</Text>
+              <Text style={styles.propertyCount}>({properties.filter(p => p.postStatus === 'PUBLISHED').length})</Text>
+            </View>
+
+            {/* Error Message */}
+            {error && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>⚠️ {error}</Text>
+              </View>
+            )}
+
+            {/* Loading State */}
+            {loading && properties.length === 0 ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#5585b5" />
+                <Text style={styles.emptyText}>Cargando propiedades...</Text>
+              </View>
+            ) : properties.filter(p => p.postStatus === 'PUBLISHED').length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={{ fontSize: 48 }}>📝</Text>
+                <Text style={styles.emptyText}>No tienes propiedades publicadas</Text>
+              </View>
+            ) : (
+              <View style={styles.gridContainer}>
+                {properties.filter(p => p.postStatus === 'PUBLISHED').map((property) => renderPropertyCard(property))}
+              </View>
+            )}
+          </View>
+        ) : (
+          // FAVORITOS TAB
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Favoritos</Text>
+              <Text style={styles.propertyCount}>({favorites.length})</Text>
+            </View>
+
+            {/* Error Message */}
+            {error && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>⚠️ {error}</Text>
+              </View>
+            )}
+
+            {/* Loading State */}
+            {loading && favorites.length === 0 ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#5585b5" />
+                <Text style={styles.emptyText}>Cargando favoritos...</Text>
+              </View>
+            ) : favorites.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={{ fontSize: 48 }}>💔</Text>
+                <Text style={styles.emptyText}>No tienes favoritos aún</Text>
+              </View>
+            ) : (
+              <View style={styles.gridContainer}>
+                {favorites.map((favorite) => renderFavoriteCard(favorite))}
+              </View>
+            )}
+          </View>
+        )}
       </ScrollView>
 
       {/* Modal de opciones */}
@@ -705,6 +969,20 @@ export default function ProfileScreen() {
               <Text style={[styles.modalOptionText, styles.modalOptionEdit]}>Editar</Text>
             </TouchableOpacity>
 
+            {/* Opción Archivar */}
+            <TouchableOpacity
+              style={styles.modalOption}
+              onPress={() => {
+                if (selectedProperty) {
+                  setModalVisible(false);
+                  handleArchiveProperty(selectedProperty.id, selectedProperty.title);
+                }
+              }}
+            >
+              <MaterialCommunityIcons name="archive" size={24} color="#f59e0b" />
+              <Text style={[styles.modalOptionText, styles.modalOptionArchive]}>Archivar</Text>
+            </TouchableOpacity>
+
             {/* Opción Eliminar */}
             <TouchableOpacity
               style={[styles.modalOption, styles.modalOptionLast]}
@@ -720,6 +998,62 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* Menu Modal - Bottom Sheet */}
+      <Modal
+        visible={showMenu}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowMenu(false)}
+      >
+        <View style={styles.menuModalOverlay}>
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={() => setShowMenu(false)}
+          />
+          <View style={styles.menuModalContent}>
+            <Text style={styles.menuModalHeader}>Menú</Text>
+
+            {/* Borradores */}
+            <TouchableOpacity
+              style={styles.menuOption}
+              onPress={() => {
+                router.push('/drafts');
+                setShowMenu(false);
+              }}
+            >
+              <MaterialCommunityIcons name="file-document" size={20} color="#f59e0b" />
+              <Text style={styles.menuOptionText}>Borradores</Text>
+            </TouchableOpacity>
+
+            {/* Archivados */}
+            <TouchableOpacity
+              style={styles.menuOption}
+              onPress={() => {
+                router.push('/archived');
+                setShowMenu(false);
+              }}
+            >
+              <MaterialCommunityIcons name="archive" size={20} color="#8b5cf6" />
+              <Text style={styles.menuOptionText}>Archivados</Text>
+            </TouchableOpacity>
+
+            {/* Cerrar Sesión */}
+            <TouchableOpacity
+              style={[styles.menuOption, styles.menuOptionLogout]}
+              onPress={() => {
+                setShowMenu(false);
+                handleLogout();
+              }}
+            >
+              <MaterialCommunityIcons name="logout" size={20} color="#dc2626" />
+              <Text style={[styles.menuOptionText, styles.menuOptionLogoutText]}>Cerrar Sesión</Text>
+            </TouchableOpacity>
+
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );

@@ -482,6 +482,126 @@ class ApiService {
             throw error;
         }
     }
+
+    // ============================================
+    // FAVORITOS
+    // ============================================
+
+    /**
+     * Agregar una propiedad a favoritos
+     * POST /api/favorites/:propertyId
+     */
+    async addFavorite(propertyId: string) {
+        try {
+            console.log('❤️ [addFavorite] Agregando a favoritos:', propertyId);
+            const response = await fetch(`${API_BASE_URL}/favorites/${propertyId}`, {
+                method: 'POST',
+                headers: this.getHeaders(),
+            });
+
+            const data = await this.handleResponse(response);
+            console.log('✅ Propiedad agregada a favoritos');
+            return data;
+        } catch (error: any) {
+            console.error('❌ Error agregando a favoritos:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Remover una propiedad de favoritos
+     * DELETE /api/favorites/:propertyId
+     */
+    async removeFavorite(propertyId: string) {
+        try {
+            console.log('💔 [removeFavorite] Removiendo de favoritos:', propertyId);
+            const response = await fetch(`${API_BASE_URL}/favorites/${propertyId}`, {
+                method: 'DELETE',
+                headers: this.getHeaders(),
+            });
+
+            const data = await this.handleResponse(response);
+            console.log('✅ Propiedad removida de favoritos');
+            return data;
+        } catch (error: any) {
+            console.error('❌ Error removiendo de favoritos:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Obtener todas las propiedades favoritas del usuario
+     * GET /api/favorites
+     */
+    async getFavorites() {
+        try {
+            console.log('⭐ [getFavorites] Obteniendo favoritos del usuario');
+            const response = await fetch(`${API_BASE_URL}/favorites`, {
+                headers: this.getHeaders(),
+            });
+
+            const data = await this.handleResponse(response);
+            console.log('✅ Favoritos obtenidos:', {
+                count: data.favorites?.length,
+            });
+            return data;
+        } catch (error: any) {
+            console.error('❌ Error obteniendo favoritos:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Verificar si una propiedad está en favoritos
+     * GET /api/favorites/check/:propertyId
+     */
+    async isFavorite(propertyId: string) {
+        try {
+            console.log('🔍 [isFavorite] Verificando favorito:', propertyId);
+            const response = await fetch(`${API_BASE_URL}/favorites/check/${propertyId}`, {
+                headers: this.getHeaders(),
+            });
+
+            const data = await this.handleResponse(response);
+            console.log('✅ Verificación completada:', data.isFavorite);
+            return data;
+        } catch (error: any) {
+            console.error('❌ Error verificando favorito:', error);
+            throw error;
+        }
+    }
+
+    async publishProperty(propertyId: string) {
+        try {
+            console.log('📤 [publishProperty] Publishing property:', propertyId);
+            const response = await fetch(`${API_BASE_URL}/properties/${propertyId}/publish`, {
+                method: 'PATCH',
+                headers: this.getHeaders(),
+            });
+            const data = await this.handleResponse(response);
+            console.log('✅ Propiedad publicada:', data);
+            return data;
+        } catch (error: any) {
+            console.error('❌ Error publicando propiedad:', error);
+            throw error;
+        }
+    }
+
+    async archiveProperty(propertyId: string) {
+        try {
+            console.log('📦 [archiveProperty] Archiving property:', propertyId);
+            const response = await fetch(`${API_BASE_URL}/properties/${propertyId}/archive`, {
+                method: 'PATCH',
+                headers: this.getHeaders(),
+            });
+            const data = await this.handleResponse(response);
+            console.log('✅ Propiedad archivada:', data);
+            return data;
+        } catch (error: any) {
+            console.error('❌ Error archivando propiedad:', error);
+            throw error;
+        }
+    }
 }
 
 export const apiService = new ApiService();

@@ -1,3 +1,6 @@
+import { CURRENCIES } from '@/config/currencies.config';
+import { validateAmenities, validateSpecifications } from '@/config/property-types.config';
+import { usePropertyTypeConfig } from '@/hooks/use-property-type-config';
 import { apiService, SERVER_BASE_URL } from '@/services/api';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -204,13 +207,13 @@ const createStyles = (width: number) => {
       fontWeight: '500',
     },
     submitButton: {
+      width: '100%',
       backgroundColor: '#5585b5',
       borderRadius: 10,
       paddingVertical: 16,
       alignItems: 'center',
       flexDirection: 'row',
       justifyContent: 'center',
-      marginBottom: 32,
       shadowColor: '#5585b5',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.25,
@@ -226,6 +229,35 @@ const createStyles = (width: number) => {
       fontSize: 15,
       fontWeight: '700',
       letterSpacing: 0.5,
+    },
+    draftButton: {
+      width: '100%',
+      backgroundColor: '#f0f4ff',
+      borderRadius: 10,
+      paddingVertical: 16,
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'center',
+      borderWidth: 1.5,
+      borderColor: '#5585b5',
+    },
+    draftButtonDisabled: {
+      backgroundColor: '#e2e8f0',
+      borderColor: '#94a3b8',
+    },
+    draftButtonText: {
+      color: '#5585b5',
+      fontSize: 15,
+      fontWeight: '700',
+      letterSpacing: 0.5,
+    },
+    draftButtonTextDisabled: {
+      color: '#94a3b8',
+    },
+    buttonsContainer: {
+      flexDirection: 'column',
+      gap: 12,
+      marginBottom: 32,
     },
     mapButton: {
       backgroundColor: '#f0f4ff',
@@ -339,6 +371,86 @@ const createStyles = (width: number) => {
       fontWeight: '600',
       color: '#64748b',
     },
+    // Estilos para dropdown de moneda
+    dropdownButton: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: '#e2e8f0',
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      backgroundColor: '#f8fafc',
+      justifyContent: 'center',
+      marginBottom: 12,
+    },
+    dropdownButtonText: {
+      fontSize: 14,
+      color: '#0f172a',
+      fontWeight: '600',
+    },
+    currencyModal: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    },
+    currencyModalContent: {
+      backgroundColor: '#ffffff',
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingHorizontal: 16,
+      paddingVertical: 20,
+      paddingBottom: 32,
+      maxHeight: '80%',
+    },
+    currencyModalHeader: {
+      alignItems: 'center',
+      marginBottom: 20,
+      paddingBottom: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: '#e2e8f0',
+    },
+    currencyModalTitle: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: '#5585b5',
+    },
+    currencyOption: {
+      paddingVertical: 16,
+      paddingHorizontal: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: '#e2e8f0',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    currencyOptionText: {
+      fontSize: 14,
+      color: '#0f172a',
+      fontWeight: '500',
+    },
+    currencyOptionActive: {
+      backgroundColor: '#f0f4ff',
+    },
+    currencyOptionCheck: {
+      fontSize: 18,
+      color: '#5585b5',
+      fontWeight: '700',
+    },
+    currencyModalClose: {
+      marginTop: 12,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      backgroundColor: '#f1f5f9',
+      borderRadius: 12,
+      alignItems: 'center',
+      borderWidth: 1.5,
+      borderColor: '#e2e8f0',
+    },
+    currencyModalCloseText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: '#64748b',
+    },
   });
 };
 
@@ -347,27 +459,32 @@ export default function CreatePostScreen() {
   const styles = createStyles(width);
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Estado principal del formulario
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     price: '',
+    currency: 'BOB',
     propertyType: 'APARTMENT',
     operationType: 'SALE',
-    bedrooms: '',
-    bathrooms: '',
-    area: '',
     address: '',
     city: '',
     latitude: '',
     longitude: '',
     contactPhone: '',
     amenities: [] as string[],
+    specifications: {} as Record<string, any>,
   });
 
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+
+  // Cargar configuración dinámica del tipo de propiedad
+  const { config: propertyConfig } = usePropertyTypeConfig(formData.propertyType);
 
   // MapViewComponent para seleccionar ubicación
   const MapViewComponent = require('@/components/map-view-property').default;
@@ -389,25 +506,22 @@ export default function CreatePostScreen() {
     { label: 'Anticrético', value: 'ANTICRETICO' },
   ];
 
-  const amenitiesList = [
-    'WiFi',
-    'Aire acondicionado',
-    'Piscina',
-    'Gym',
-    'Estacionamiento',
-    'Seguridad 24/7',
-    'Ascensor',
-    'Balcón',
-    'Jardín',
-    'Terraza',
-  ];
-
-  const toggleAmenity = (amenity: string) => {
+  const toggleAmenity = (amenityId: string) => {
     setFormData(prev => ({
       ...prev,
-      amenities: prev.amenities.includes(amenity)
-        ? prev.amenities.filter(a => a !== amenity)
-        : [...prev.amenities, amenity],
+      amenities: prev.amenities.includes(amenityId)
+        ? prev.amenities.filter(a => a !== amenityId)
+        : [...prev.amenities, amenityId],
+    }));
+  };
+
+  const updateSpecification = (key: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      specifications: {
+        ...prev.specifications,
+        [key]: value,
+      },
     }));
   };
 
@@ -539,9 +653,10 @@ export default function CreatePostScreen() {
     event.target.value = '';
   };
 
-  const handleSubmit = async () => {
+  const handlePublish = async (postStatus: 'DRAFT' | 'PUBLISHED') => {
+    // Validar campos obligatorios
     if (!formData.title || !formData.description || !formData.price) {
-      Alert.alert('Error', 'Por favor completa los campos obligatorios');
+      Alert.alert('Error', 'Por favor completa los campos obligatorios: Título, Descripción y Precio');
       return;
     }
 
@@ -550,18 +665,43 @@ export default function CreatePostScreen() {
       return;
     }
 
+    // Validar specifications dinámicas
+    if (propertyConfig) {
+      const specValidation = validateSpecifications(
+        formData.propertyType,
+        formData.specifications,
+      );
+      if (!specValidation.valid) {
+        Alert.alert('Error de validación', specValidation.errors.join('\n'));
+        return;
+      }
+
+      // Validar amenities
+      const amenitiesValidation = validateAmenities(
+        formData.propertyType,
+        formData.amenities,
+      );
+      if (!amenitiesValidation.valid) {
+        Alert.alert('Error de validación', amenitiesValidation.errors.join('\n'));
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
       const data = new FormData();
       data.append('title', formData.title);
       data.append('description', formData.description);
-      data.append('price', formData.price);
+      // Remover separador de miles al enviar al API
+      data.append('price', formData.price.replace(/,/g, ''));
+      data.append('currency', formData.currency);
       data.append('propertyType', formData.propertyType);
       data.append('operationType', formData.operationType);
+      data.append('postStatus', postStatus);
 
-      if (formData.bedrooms) data.append('bedrooms', formData.bedrooms);
-      if (formData.bathrooms) data.append('bathrooms', formData.bathrooms);
-      if (formData.area) data.append('area', formData.area);
+      // ✅ IMPORTANTE: Enviar specifications como JSON string para que NestJS lo parsee
+      // El backend DEBE tener un @Transform en el DTO para parsear esto
+      data.append('specifications', JSON.stringify(formData.specifications || {}));
 
       data.append('address', formData.address || 'No especificado');
       data.append('city', formData.city || 'No especificado');
@@ -577,7 +717,15 @@ export default function CreatePostScreen() {
         data.append('amenities', '');
       }
 
-      console.log('📸 [handleSubmit] Preparando', selectedImages.length, 'imágenes...');
+      console.log('📸 [handlePublish] Datos siendo enviados:');
+      console.log('   Title:', formData.title);
+      console.log('   PropertyType:', formData.propertyType);
+      console.log('   Currency:', formData.currency);
+      console.log('   Specifications:', formData.specifications);
+      console.log('   Amenities:', formData.amenities);
+      console.log('   Imágenes:', selectedImages.length);
+
+      console.log('📸 [handlePublish] Preparando', selectedImages.length, 'imágenes con postStatus:', postStatus);
       selectedImages.forEach((imageUri, index) => {
         const filename = imageUri.split('/').pop() || `image_${index}`;
         const match = /\.(\w+)$/.exec(filename);
@@ -592,19 +740,24 @@ export default function CreatePostScreen() {
           type: type,
         });
       });
-      console.log('✅ [handleSubmit] Imágenes agregadas a FormData');
+      console.log('✅ [handlePublish] FormData completado, enviando al API...');
 
       const response = await apiService.createPropertyWithImages(data);
 
-      console.log('📸 [handleSubmit] Respuesta del API:');
+      console.log('📸 [handlePublish] Respuesta del API:');
       console.log('   ID Propiedad:', response?.id);
+      console.log('   PostStatus:', response?.postStatus);
       console.log('   Imágenes:', JSON.stringify(response?.images, null, 2));
       if (response?.images && response.images.length > 0) {
         console.log('   Primera imagen URL:', response.images[0].url);
         console.log('   Full URL:', `${SERVER_BASE_URL}${response.images[0].url}`);
       }
 
-      Alert.alert('Éxito', 'Tu propiedad ha sido publicada correctamente', [
+      const successMessage = postStatus === 'DRAFT'
+        ? 'Borrador guardado correctamente'
+        : 'Tu propiedad ha sido publicada correctamente';
+
+      Alert.alert('Éxito', successMessage, [
         {
           text: 'OK',
           onPress: () => {
@@ -612,17 +765,16 @@ export default function CreatePostScreen() {
               title: '',
               description: '',
               price: '',
+              currency: 'BOB',
               propertyType: 'APARTMENT',
               operationType: 'SALE',
-              bedrooms: '',
-              bathrooms: '',
-              area: '',
               address: '',
               city: '',
               latitude: '',
               longitude: '',
               contactPhone: '',
               amenities: [],
+              specifications: {},
             });
             setSelectedImages([]);
             // Redirigir a perfil con refresh automático
@@ -632,11 +784,14 @@ export default function CreatePostScreen() {
       ]);
     } catch (error: any) {
       console.error('Error publicando propiedad:', error);
-      Alert.alert('Error', error.message || 'No se pudo publicar la propiedad');
+      Alert.alert('Error', error.message || 'No se pudo guardar la propiedad');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const handleSaveDraft = () => handlePublish('DRAFT');
+  const handlePublishProperty = () => handlePublish('PUBLISHED');
 
   return (
     <SafeAreaView style={styles.safeContainer}>
@@ -707,6 +862,48 @@ export default function CreatePostScreen() {
         </View>
       </Modal>
 
+      {/* Modal de Selección de Moneda */}
+      <Modal visible={showCurrencyModal} transparent animationType="slide">
+        <View style={styles.currencyModal}>
+          <View style={styles.currencyModalContent}>
+            {/* Header */}
+            <View style={styles.currencyModalHeader}>
+              <Text style={styles.currencyModalTitle}>Seleccionar Moneda</Text>
+            </View>
+
+            {/* Opciones de Moneda */}
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {CURRENCIES.map((curr: any) => (
+                <TouchableOpacity
+                  key={curr.value}
+                  style={[styles.currencyOption, formData.currency === curr.value && styles.currencyOptionActive]}
+                  onPress={() => {
+                    setFormData({ ...formData, currency: curr.value });
+                    setShowCurrencyModal(false);
+                  }}
+                >
+                  <View>
+                    <Text style={styles.currencyOptionText}>{curr.symbol} {curr.value}</Text>
+                    <Text style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>{curr.label}</Text>
+                  </View>
+                  {formData.currency === curr.value && (
+                    <Text style={styles.currencyOptionCheck}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* Cerrar Modal */}
+            <TouchableOpacity
+              style={styles.currencyModalClose}
+              onPress={() => setShowCurrencyModal(false)}
+            >
+              <Text style={styles.currencyModalCloseText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.headerContainer}>
@@ -739,15 +936,37 @@ export default function CreatePostScreen() {
                 onChangeText={(text) => setFormData({ ...formData, description: text })}
               />
 
-              <Text style={styles.fieldLabel}>Precio *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ej: 150000"
-                placeholderTextColor="#cbd5e1"
-                keyboardType="numeric"
-                value={formData.price}
-                onChangeText={(text) => setFormData({ ...formData, price: text })}
-              />
+              <View style={styles.row}>
+                <View style={styles.halfInput}>
+                  <Text style={styles.fieldLabel}>Moneda *</Text>
+                  <TouchableOpacity
+                    style={styles.dropdownButton}
+                    onPress={() => setShowCurrencyModal(true)}
+                  >
+                    <Text style={styles.dropdownButtonText}>
+                      {CURRENCIES.find((c: any) => c.value === formData.currency)?.symbol} {formData.currency}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.halfInput}>
+                  <Text style={styles.fieldLabel}>Precio *</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Ej: 150,000"
+                    placeholderTextColor="#cbd5e1"
+                    keyboardType="numeric"
+                    value={formData.price}
+                    onChangeText={(text) => {
+                      // Remover puntos/comas existentes y guardar solo números
+                      const numericValue = text.replace(/[^\d]/g, '');
+                      // Formatear con separador de miles
+                      const formattedValue = numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                      setFormData({ ...formData, price: formattedValue });
+                    }}
+                  />
+                </View>
+              </View>
             </View>
 
             <View style={styles.section}>
@@ -789,40 +1008,92 @@ export default function CreatePostScreen() {
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Características</Text>
+              <Text style={styles.sectionTitle}>Características de {propertyConfig?.label || 'Propiedad'}</Text>
 
-              <View style={styles.row}>
-                <View style={[styles.halfInput, { marginBottom: 16 }]}>
-                  <Text style={styles.fieldLabel}>Dormitorios</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Ej: 3"
-                    keyboardType="numeric"
-                    value={formData.bedrooms}
-                    onChangeText={(text) => setFormData({ ...formData, bedrooms: text })}
-                  />
-                </View>
+              {propertyConfig ? (
+                propertyConfig.fields.map((field) => (
+                  <View key={field.key} style={{ marginBottom: 16 }}>
+                    <Text style={styles.fieldLabel}>
+                      {field.label}
+                      {field.required ? ' *' : ''}
+                    </Text>
 
-                <View style={[styles.halfInput, { marginBottom: 16 }]}>
-                  <Text style={styles.fieldLabel}>Baños</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Ej: 2"
-                    keyboardType="numeric"
-                    value={formData.bathrooms}
-                    onChangeText={(text) => setFormData({ ...formData, bathrooms: text })}
-                  />
-                </View>
-              </View>
+                    {field.type === 'number' && (
+                      <TextInput
+                        style={styles.input}
+                        placeholder={field.placeholder || `Ej: ${field.min || 0}`}
+                        keyboardType="numeric"
+                        value={formData.specifications[field.key]?.toString() || ''}
+                        onChangeText={(text) => updateSpecification(field.key, text ? parseInt(text) : null)}
+                      />
+                    )}
 
-              <Text style={styles.fieldLabel}>Área (m²)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ej: 120"
-                keyboardType="numeric"
-                value={formData.area}
-                onChangeText={(text) => setFormData({ ...formData, area: text })}
-              />
+                    {field.type === 'decimal' && (
+                      <View style={styles.row}>
+                        <TextInput
+                          style={[styles.halfInput, styles.input]}
+                          placeholder={field.placeholder || 'Ej: 120.5'}
+                          keyboardType="decimal-pad"
+                          value={formData.specifications[field.key]?.toString() || ''}
+                          onChangeText={(text) => updateSpecification(field.key, text ? parseFloat(text) : null)}
+                        />
+                        {field.unit && (
+                          <View style={[styles.halfInput, { justifyContent: 'center', paddingLeft: 8 }]}>
+                            <Text style={styles.fieldLabel}>{field.unit}</Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
+
+                    {field.type === 'boolean' && (
+                      <TouchableOpacity
+                        style={[
+                          styles.checkboxItem,
+                          formData.specifications[field.key] && styles.checkboxItemActive,
+                        ]}
+                        onPress={() => updateSpecification(field.key, !formData.specifications[field.key])}
+                      >
+                        <Text
+                          style={[
+                            styles.checkboxText,
+                            formData.specifications[field.key] && styles.checkboxTextActive,
+                          ]}
+                        >
+                          {formData.specifications[field.key] ? '✓' : '○'} {field.label}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {field.type === 'select' && (
+                      <View style={styles.checkboxContainer}>
+                        {field.options?.map((option) => (
+                          <TouchableOpacity
+                            key={option.value}
+                            style={[
+                              styles.checkboxItem,
+                              formData.specifications[field.key] === option.value &&
+                              styles.checkboxItemActive,
+                            ]}
+                            onPress={() => updateSpecification(field.key, option.value)}
+                          >
+                            <Text
+                              style={[
+                                styles.checkboxText,
+                                formData.specifications[field.key] === option.value &&
+                                styles.checkboxTextActive,
+                              ]}
+                            >
+                              {option.label}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                ))
+              ) : (
+                <Text style={{ color: '#64748b' }}>Cargando configuración...</Text>
+              )}
             </View>
 
             <View style={styles.section}>
@@ -918,23 +1189,33 @@ export default function CreatePostScreen() {
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Amenidades</Text>
+              <Text style={styles.sectionTitle}>Amenidades para {propertyConfig?.label || 'Propiedad'}</Text>
 
-              <View style={styles.checkboxContainer}>
-                {amenitiesList.map((amenity) => (
-                  <TouchableOpacity
-                    key={amenity}
-                    style={[styles.checkboxItem, formData.amenities.includes(amenity) && styles.checkboxItemActive]}
-                    onPress={() => toggleAmenity(amenity)}
-                  >
-                    <Text
-                      style={[styles.checkboxText, formData.amenities.includes(amenity) && styles.checkboxTextActive]}
+              {propertyConfig && propertyConfig.amenities.length > 0 ? (
+                <View style={styles.checkboxContainer}>
+                  {propertyConfig.amenities.map((amenity) => (
+                    <TouchableOpacity
+                      key={amenity.id}
+                      style={[
+                        styles.checkboxItem,
+                        formData.amenities.includes(amenity.id) && styles.checkboxItemActive,
+                      ]}
+                      onPress={() => toggleAmenity(amenity.id)}
                     >
-                      {formData.amenities.includes(amenity) ? '✓' : '○'} {amenity}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                      <Text
+                        style={[
+                          styles.checkboxText,
+                          formData.amenities.includes(amenity.id) && styles.checkboxTextActive,
+                        ]}
+                      >
+                        {formData.amenities.includes(amenity.id) ? '✓' : '○'} {amenity.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : (
+                <Text style={{ color: '#64748b' }}>Este tipo de propiedad no tiene amenidades disponibles</Text>
+              )}
             </View>
 
             <View style={styles.section}>
@@ -971,20 +1252,37 @@ export default function CreatePostScreen() {
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
-              onPress={handleSubmit}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <ActivityIndicator color="#ffffff" style={{ marginRight: 8 }} />
-                  <Text style={styles.submitButtonText}>Publicando...</Text>
-                </>
-              ) : (
-                <Text style={styles.submitButtonText}>PUBLICAR PROPIEDAD</Text>
-              )}
-            </TouchableOpacity>
+            <View style={styles.buttonsContainer}>
+              <TouchableOpacity
+                style={[styles.draftButton, isSubmitting && styles.draftButtonDisabled]}
+                onPress={handleSaveDraft}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <ActivityIndicator color="#5585b5" style={{ marginRight: 8 }} />
+                    <Text style={[styles.draftButtonText]}>Guardando...</Text>
+                  </>
+                ) : (
+                  <Text style={styles.draftButtonText}>GUARDAR BORRADOR</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+                onPress={handlePublishProperty}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <ActivityIndicator color="#ffffff" style={{ marginRight: 8 }} />
+                    <Text style={styles.submitButtonText}>Publicando...</Text>
+                  </>
+                ) : (
+                  <Text style={styles.submitButtonText}>PUBLICAR PROPIEDAD</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </ScrollView>
       </View>

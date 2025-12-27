@@ -6,8 +6,10 @@ export interface Property {
     title: string;
     description: string;
     price: number;
+    currency?: string; // BOB, USD, ARS, PEN, CLP, MXN, COP
     propertyType: string;
     operationType: string;
+    postStatus: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
     latitude: number;
     longitude: number;
     address: string;
@@ -17,6 +19,7 @@ export interface Property {
     area?: number;
     parking: number;
     amenities?: string[];
+    specifications?: Record<string, any>; // Características dinámicas
     contactPhone?: string;
     images: Array<{ id: string; url: string; order: number }>;
     owner: {
@@ -195,6 +198,42 @@ export const useProperties = () => {
         }
     }, []);
 
+    const publishProperty = useCallback(async (id: string) => {
+        try {
+            setLoading(true);
+            setError(null);
+
+            const response = await apiService.publishProperty(id);
+            console.log('✅ Propiedad publicada:', id);
+            return response;
+        } catch (err: any) {
+            const errorMessage = err?.message || 'Error al publicar propiedad';
+            setError(errorMessage);
+            console.error('Error publishing property:', errorMessage);
+            throw err;
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    const archiveProperty = useCallback(async (id: string) => {
+        try {
+            setLoading(true);
+            setError(null);
+
+            const response = await apiService.archiveProperty(id);
+            console.log('📦 Propiedad archivada:', id);
+            return response;
+        } catch (err: any) {
+            const errorMessage = err?.message || 'Error al archivar propiedad';
+            setError(errorMessage);
+            console.error('Error archiving property:', errorMessage);
+            throw err;
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     return {
         properties,
         loading,
@@ -206,5 +245,7 @@ export const useProperties = () => {
         createProperty,
         updateProperty,
         deleteProperty,
+        publishProperty,
+        archiveProperty,
     };
 };

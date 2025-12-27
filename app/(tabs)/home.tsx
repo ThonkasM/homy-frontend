@@ -1,4 +1,6 @@
+import { formatPriceWithCurrency } from '@/config/currencies.config';
 import { useAuth } from '@/context/auth-context';
+import { useFavoritesContext } from '@/context/favorites-context';
 import { Property, useProperties } from '@/hooks/use-properties';
 import { SERVER_BASE_URL } from '@/services/api';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -167,7 +169,7 @@ const PropertyCard = ({
           {/* Información superpuesta */}
           <View style={styles.propertyOverlayContent}>
             <Text style={styles.propertyPrice}>
-              ${property.price.toLocaleString()}
+              {formatPriceWithCurrency(property.price, property.currency || 'BOB')}
             </Text>
             <Text numberOfLines={2} style={styles.propertyTitle}>
               {property.title}
@@ -518,16 +520,31 @@ export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { properties, loading, error, fetchProperties } = useProperties();
+  const { favorites, fetchFavorites, addFavorite, removeFavorite } = useFavoritesContext();
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  const [likedProperties, setLikedProperties] = useState<Set<string>>(new Set());
   const { width } = useWindowDimensions();
   const styles = createStyles(width);
   const isMobile = width <= 768;
 
+  // Create a Set of favorite property IDs for quick lookup
+  const likedProperties = new Set(
+    favorites.map((fav) => fav.propertyId)
+  );
+
   useEffect(() => {
     loadProperties();
+    loadFavorites();
   }, []);
+
+  const loadFavorites = async () => {
+    try {
+      console.log('[HomeScreen] Cargando favoritos...');
+      await fetchFavorites();
+    } catch (err) {
+      console.error('[HomeScreen] Error cargando favoritos:', err);
+    }
+  };
 
   const loadProperties = async () => {
     try {
@@ -557,15 +574,33 @@ export default function HomeScreen() {
     router.push(`/property-detail/${propertyId}`);
   };
 
-  const handleLike = (propertyId: string, e: any) => {
+  const handleLike = async (propertyId: string, e: any) => {
     e.stopPropagation();
-    const newLiked = new Set(likedProperties);
-    if (newLiked.has(propertyId)) {
-      newLiked.delete(propertyId);
-    } else {
-      newLiked.add(propertyId);
+    try {
+      if (likedProperties.has(propertyId)) {
+        // Remove from favorites
+        console.log('[HomeScreen] Removiendo de favoritos:', propertyId);
+        await removeFavorite(propertyId);
+      } else {
+        // Add to favorites
+        console.log('[HomeScreen] Añadiendo a favoritos:', propertyId);
+        await addFavorite(propertyId);
+      }
+    } catch (err: any) {
+      console.error('[HomeScreen] Error al actualizar favoritos:', err);
+
+      // Extraer mensaje de error del response
+      let errorMessage = 'No se pudo actualizar los favoritos';
+      if (err.message) {
+        errorMessage = err.message;
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      }
+
+      Alert.alert('⚠️ Error', errorMessage);
     }
-    setLikedProperties(newLiked);
   };
 
   // 🗺️ Abre selector nativo de apps de mapas
@@ -652,7 +687,7 @@ export default function HomeScreen() {
       const shareMessage = `🏠 Mira esta propiedad en Homi:
 
 *${property.title}*
-$${property.price.toLocaleString()}
+${formatPriceWithCurrency(property.price, property.currency || 'BOB')}
 📍 ${property.city} - ${property.address}
 
 ${deepLink}`;
