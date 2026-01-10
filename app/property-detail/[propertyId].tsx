@@ -926,11 +926,87 @@ export default function PropertyDetailScreen() {
       >
         <View style={styles.fullscreenImageContainer}>
           {fullscreenImageIndex !== null && (
-            <Image
-              source={{ uri: propertyImages[fullscreenImageIndex]?.url }}
-              style={styles.fullscreenImage}
-            />
+            <>
+              <Image
+                source={{ uri: propertyImages[fullscreenImageIndex]?.url }}
+                style={styles.fullscreenImage}
+              />
+
+              {/* Botones de navegación izquierda y derecha */}
+              {propertyImages.length > 1 && (
+                <>
+                  {/* Botón anterior */}
+                  <TouchableOpacity
+                    style={[
+                      styles.floatingButton,
+                      {
+                        position: 'absolute',
+                        left: 16,
+                        top: '50%',
+                        marginTop: -22,
+                        zIndex: 20,
+                      },
+                    ]}
+                    onPress={() => {
+                      const newIndex = Math.max(0, fullscreenImageIndex - 1);
+                      setFullscreenImageIndex(newIndex);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="chevron-back" size={24} color="#5585b5" />
+                  </TouchableOpacity>
+
+                  {/* Botón siguiente */}
+                  <TouchableOpacity
+                    style={[
+                      styles.floatingButton,
+                      {
+                        position: 'absolute',
+                        right: 16,
+                        top: '50%',
+                        marginTop: -22,
+                        zIndex: 20,
+                      },
+                    ]}
+                    onPress={() => {
+                      const newIndex = Math.min(propertyImages.length - 1, fullscreenImageIndex + 1);
+                      setFullscreenImageIndex(newIndex);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="chevron-forward" size={24} color="#5585b5" />
+                  </TouchableOpacity>
+
+                  {/* Indicador de página */}
+                  <View
+                    style={{
+                      position: 'absolute',
+                      bottom: 24,
+                      left: 0,
+                      right: 0,
+                      alignItems: 'center',
+                      zIndex: 20,
+                    }}
+                  >
+                    <View
+                      style={{
+                        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderRadius: 8,
+                      }}
+                    >
+                      <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '600' }}>
+                        {fullscreenImageIndex + 1} / {propertyImages.length}
+                      </Text>
+                    </View>
+                  </View>
+                </>
+              )}
+            </>
           )}
+
+          {/* Botón cerrar */}
           <TouchableOpacity
             style={styles.fullscreenCloseButton}
             onPress={() => setFullscreenImageIndex(null)}
@@ -1164,9 +1240,9 @@ export default function PropertyDetailScreen() {
                       if (typeof value === 'boolean') {
                         return value ? (
                           <View key={key} style={styles.featureCard}>
-                            <MaterialCommunityIcons name="check-circle" size={20} color="#10b981" />
+                            <MaterialCommunityIcons name="information" size={20} color="#5585b5" />
                             <View>
-                              <Text style={[styles.featureLabel, { color: '#10b981' }]}>{label}</Text>
+                              <Text style={[styles.featureLabel, { color: '#5585b5' }]}>{label}</Text>
                             </View>
                           </View>
                         ) : null;

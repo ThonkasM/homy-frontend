@@ -72,13 +72,21 @@ function MapViewExploreMobile({
         console.log('🗺️ MapViewExplore - Propiedades actualizadas:', {
             propertiesLength: properties?.length,
             loadedPropertiesLength: loadedProperties?.length,
+            selectedFilters: selectedFilters,
         });
 
         if (properties && properties.length > 0) {
+            console.log('📊 Tipos de propiedades en datos:',
+                properties.map((p: any) => ({
+                    id: p.id,
+                    type: p.propertyType,
+                    typeUpperCase: p.propertyType?.toUpperCase(),
+                }))
+            );
             setLoadedProperties(properties);
             console.log('✅ Propiedades cargadas en el mapa de exploración:', properties.length);
         }
-    }, [properties]);
+    }, [properties, selectedFilters]);
 
     const initialRegion = {
         latitude: userLocation?.latitude || -17.8,
@@ -91,15 +99,21 @@ function MapViewExploreMobile({
     const getMarkerColor = (propertyType: string): string => {
         switch (propertyType?.toUpperCase()) {
             case 'HOUSE':
-                return '#5585b5'; // Azul profundo
+                return '#5585b5'; // Azul
             case 'APARTMENT':
                 return '#10b981'; // Verde
+            case 'OFFICE':
+                return '#f97316'; // Naranja
             case 'LAND':
-                return '#f59e0b'; // Naranja
+                return '#f59e0b'; // Ámbar
             case 'COMMERCIAL':
                 return '#8b5cf6'; // Púrpura
+            case 'WAREHOUSE':
+                return '#6366f1'; // Índigo
+            case 'ROOM':
+                return '#ec4899'; // Rosa
             default:
-                return '#5585b5'; // Azul profundo por defecto
+                return '#5585b5'; // Azul por defecto
         }
     };
 
@@ -129,7 +143,14 @@ function MapViewExploreMobile({
             >
                 {/* Marcadores de propiedades filtradas */}
                 {loadedProperties && loadedProperties
-                    .filter((property: any) => selectedFilters[property.propertyType.toUpperCase()])
+                    .filter((property: any) => {
+                        const typeUpper = property.propertyType?.toUpperCase();
+                        const isFiltered = selectedFilters[typeUpper];
+                        if (!isFiltered) {
+                            console.log(`⚠️ Propiedad filtrada: ${property.title} (${typeUpper}) - Filter: ${isFiltered}`);
+                        }
+                        return isFiltered;
+                    })
                     .map((property: any) => (
                         <Marker
                             key={property.id}

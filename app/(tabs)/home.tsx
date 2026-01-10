@@ -3,7 +3,7 @@ import { useAuth } from '@/context/auth-context';
 import { useFavoritesContext } from '@/context/favorites-context';
 import { Property, useProperties } from '@/hooks/use-properties';
 import { SERVER_BASE_URL } from '@/services/api';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ExpoLinking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -14,6 +14,7 @@ import {
   Dimensions,
   Image,
   Linking,
+  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -513,6 +514,142 @@ const createStyles = (width: number) => {
       letterSpacing: 0.3,
       marginLeft: isMobile ? 2 : 4,
     },
+    // Filtros styles
+    filterButtonContainer: {
+      backgroundColor: '#ffffff',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: '#e5e7eb',
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    filterButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 10,
+      backgroundColor: '#f3f4f6',
+      borderWidth: 1,
+      borderColor: '#e5e7eb',
+      gap: 8,
+    },
+    filterButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#5585b5',
+    },
+    filterBadge: {
+      marginLeft: 'auto',
+      backgroundColor: '#ef4444',
+      borderRadius: 12,
+      minWidth: 24,
+      height: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    filterBadgeText: {
+      color: '#ffffff',
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    // Modal styles
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      backgroundColor: '#ffffff',
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      maxHeight: '90%',
+      paddingTop: 0,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: '#f3f4f6',
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: '#1f2937',
+    },
+    filtersList: {
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+    },
+    filterItemContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 14,
+      gap: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: '#f3f4f6',
+    },
+    checkbox: {
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      borderWidth: 2,
+      borderColor: '#e5e7eb',
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: '#ffffff',
+    },
+    filterItemLabel: {
+      flex: 1,
+      fontSize: 15,
+      fontWeight: '500',
+      color: '#1f2937',
+    },
+    colorIndicator: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+    },
+    modalFooter: {
+      flexDirection: 'row',
+      gap: 12,
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderTopWidth: 1,
+      borderTopColor: '#f3f4f6',
+    },
+    filterActionButton: {
+      flex: 1,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 10,
+      backgroundColor: '#f3f4f6',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: '#e5e7eb',
+    },
+    filterActionButtonPrimary: {
+      backgroundColor: '#5585b5',
+      borderColor: '#5585b5',
+    },
+    filterActionButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#64748b',
+    },
+    filterActionButtonPrimaryText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#ffffff',
+    },
   });
 };
 
@@ -523,14 +660,68 @@ export default function HomeScreen() {
   const { favorites, fetchFavorites, addFavorite, removeFavorite } = useFavoritesContext();
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [selectedFilters, setSelectedFilters] = useState<{ [key: string]: boolean }>({
+    HOUSE: true,
+    APARTMENT: true,
+    OFFICE: true,
+    LAND: true,
+    COMMERCIAL: true,
+    WAREHOUSE: true,
+    ROOM: true,
+  });
   const { width } = useWindowDimensions();
   const styles = createStyles(width);
   const isMobile = width <= 768;
+
+  const propertyTypes = [
+    { type: 'HOUSE', label: 'Casa' },
+    { type: 'APARTMENT', label: 'Departamento' },
+    { type: 'OFFICE', label: 'Oficina' },
+    { type: 'LAND', label: 'Terreno' },
+    { type: 'COMMERCIAL', label: 'Comercial' },
+    { type: 'WAREHOUSE', label: 'Almacén' },
+    { type: 'ROOM', label: 'Habitación' },
+  ];
 
   // Create a Set of favorite property IDs for quick lookup
   const likedProperties = new Set(
     favorites.map((fav) => fav.propertyId)
   );
+
+  // Funciones de filtrado
+  const toggleFilter = (propertyType: string) => {
+    setSelectedFilters(prev => ({
+      ...prev,
+      [propertyType]: !prev[propertyType]
+    }));
+  };
+
+  const selectAllFilters = () => {
+    const allSelected: { [key: string]: boolean } = {};
+    propertyTypes.forEach(pt => {
+      allSelected[pt.type] = true;
+    });
+    setSelectedFilters(allSelected);
+  };
+
+  const clearAllFilters = () => {
+    const allCleared: { [key: string]: boolean } = {};
+    propertyTypes.forEach(pt => {
+      allCleared[pt.type] = false;
+    });
+    setSelectedFilters(allCleared);
+  };
+
+  const activeFilterCount = Object.values(selectedFilters).filter(Boolean).length;
+
+  // Filtrar propiedades según búsqueda y filtros de tipo
+  const filteredProperties = properties.filter((property) => {
+    const matchesSearch = property.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      property.address.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesFilter = selectedFilters[property.propertyType.toUpperCase()];
+    return matchesSearch && matchesFilter;
+  });
 
   useEffect(() => {
     loadProperties();
@@ -567,6 +758,28 @@ export default function HomeScreen() {
       console.error('Error refreshing properties:', err);
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  // Función para obtener el color del filtro según tipo de propiedad
+  const getFilterButtonColor = (propertyType: string): string => {
+    switch (propertyType?.toUpperCase()) {
+      case 'HOUSE':
+        return '#5585b5'; // Azul
+      case 'APARTMENT':
+        return '#10b981'; // Verde
+      case 'OFFICE':
+        return '#f97316'; // Naranja
+      case 'LAND':
+        return '#f59e0b'; // Ámbar
+      case 'COMMERCIAL':
+        return '#8b5cf6'; // Púrpura
+      case 'WAREHOUSE':
+        return '#6366f1'; // Índigo
+      case 'ROOM':
+        return '#ec4899'; // Rosa
+      default:
+        return '#5585b5'; // Azul por defecto
     }
   };
 
@@ -755,6 +968,89 @@ ${deepLink}`;
           </View>
         </View>
 
+        {/* Botón de Filtros */}
+        <View style={styles.filterButtonContainer}>
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setFilterModalVisible(true)}
+          >
+            <Ionicons name="filter" size={20} color="#5585b5" />
+            <Text style={styles.filterButtonText}>Filtros</Text>
+            {activeFilterCount < propertyTypes.length && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Modal de Filtros */}
+        <Modal
+          visible={filterModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setFilterModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Filtrar por tipo</Text>
+                <TouchableOpacity onPress={() => setFilterModalVisible(false)}>
+                  <Ionicons name="close" size={24} color="#1f2937" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Lista de filtros */}
+              <ScrollView style={styles.filtersList}>
+                {propertyTypes.map((pt) => (
+                  <TouchableOpacity
+                    key={pt.type}
+                    style={styles.filterItemContainer}
+                    onPress={() => toggleFilter(pt.type)}
+                  >
+                    <View
+                      style={[
+                        styles.checkbox,
+                        selectedFilters[pt.type] && {
+                          backgroundColor: getFilterButtonColor(pt.type),
+                          borderColor: getFilterButtonColor(pt.type),
+                        }
+                      ]}
+                    >
+                      {selectedFilters[pt.type] && (
+                        <Ionicons name="checkmark" size={16} color="#ffffff" />
+                      )}
+                    </View>
+                    <Text style={styles.filterItemLabel}>{pt.label}</Text>
+                    <View
+                      style={[
+                        styles.colorIndicator,
+                        { backgroundColor: getFilterButtonColor(pt.type) }
+                      ]}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* Botones de acción */}
+              <View style={styles.modalFooter}>
+                <TouchableOpacity
+                  style={styles.filterActionButton}
+                  onPress={clearAllFilters}
+                >
+                  <Text style={styles.filterActionButtonText}>Limpiar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.filterActionButton, styles.filterActionButtonPrimary]}
+                  onPress={selectAllFilters}
+                >
+                  <Text style={styles.filterActionButtonPrimaryText}>Seleccionar Todo</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
         {/* Feed tipo Instagram */}
         <ScrollView
           style={styles.feedContainer}
@@ -786,9 +1082,14 @@ ${deepLink}`;
               <Text style={{ fontSize: 64 }}>🏠</Text>
               <Text style={styles.emptyText}>No hay propiedades disponibles</Text>
             </View>
+          ) : filteredProperties.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={{ fontSize: 64 }}>🔍</Text>
+              <Text style={styles.emptyText}>No hay propiedades que coincidan con los filtros</Text>
+            </View>
           ) : (
             <View style={{ width: '100%', alignItems: 'center', paddingVertical: 8 }}>
-              {properties.map((property) => (
+              {filteredProperties.map((property) => (
                 <View key={property.id}>
                   {renderPropertyCard(property)}
                 </View>

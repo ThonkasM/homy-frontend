@@ -552,7 +552,8 @@ export default function CreatePostScreen() {
       const remainingSlots = 5 - selectedImages.length;
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
         selectionLimit: remainingSlots > 0 ? remainingSlots : 1,
         aspect: [4, 3],
         quality: 0.8,
@@ -591,7 +592,7 @@ export default function CreatePostScreen() {
 
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         aspect: [4, 3],
         quality: 0.8,
       });
@@ -721,6 +722,7 @@ export default function CreatePostScreen() {
       console.log('   Title:', formData.title);
       console.log('   PropertyType:', formData.propertyType);
       console.log('   Currency:', formData.currency);
+      console.log('   PostStatus a enviar:', postStatus);
       console.log('   Specifications:', formData.specifications);
       console.log('   Amenities:', formData.amenities);
       console.log('   Imágenes:', selectedImages.length);
@@ -746,7 +748,9 @@ export default function CreatePostScreen() {
 
       console.log('📸 [handlePublish] Respuesta del API:');
       console.log('   ID Propiedad:', response?.id);
-      console.log('   PostStatus:', response?.postStatus);
+      console.log('   PostStatus enviado:', postStatus);
+      console.log('   PostStatus recibido:', response?.postStatus);
+      console.log('   ⚠️ DIFERENCIA:', postStatus !== response?.postStatus ? 'SÍ - Backend ignoró el valor' : 'NO - Valores coinciden');
       console.log('   Imágenes:', JSON.stringify(response?.images, null, 2));
       if (response?.images && response.images.length > 0) {
         console.log('   Primera imagen URL:', response.images[0].url);
