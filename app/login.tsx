@@ -1,7 +1,7 @@
 import { useAuth } from "@/context/auth-context";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const styles = StyleSheet.create({
@@ -35,6 +35,10 @@ const styles = StyleSheet.create({
     },
     logoText: {
         fontSize: 40,
+    },
+    logoImage: {
+        width: '150%',
+        height: '150%',
     },
     appName: {
         fontSize: 20,
@@ -230,7 +234,7 @@ export default function LoginScreen() {
 
     return (
         <SafeAreaView style={styles.safeContainer}>
-            <ScrollView 
+            <ScrollView
                 contentContainerStyle={styles.scrollContainer}
                 showsVerticalScrollIndicator={false}
             >
@@ -238,9 +242,12 @@ export default function LoginScreen() {
                     {/* Top Section - Logo & Brand */}
                     <View style={styles.topSection}>
                         <View style={styles.logoContainer}>
-                            <Text style={styles.logoText}>🏡</Text>
+                            <Image
+                                source={require('@/assets/logos/BigLogo.jpeg')}
+                                style={styles.logoImage}
+                                resizeMode="contain"
+                            />
                         </View>
-                        <Text style={styles.appName}>Ho-My</Text>
                     </View>
 
                     {/* Header Section */}

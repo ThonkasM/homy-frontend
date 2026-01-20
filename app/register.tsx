@@ -39,6 +39,10 @@ const styles = StyleSheet.create({
     logoText: {
         fontSize: 40,
     },
+    logoImage: {
+        width: '150%',
+        height: '150%',
+    },
     appName: {
         fontSize: 20,
         fontWeight: '700',
@@ -360,9 +364,12 @@ export default function RegisterScreen() {
                     {/* Top Section - Logo & Brand */}
                     <View style={styles.topSection}>
                         <View style={styles.logoContainer}>
-                            <Text style={styles.logoText}>🏡</Text>
+                            <Image
+                                source={require('@/assets/logos/BigLogo.jpeg')}
+                                style={styles.logoImage}
+                                resizeMode="contain"
+                            />
                         </View>
-                        <Text style={styles.appName}>Ho-My</Text>
                     </View>
 
                     {/* Header Section */}

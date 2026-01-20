@@ -8,6 +8,8 @@ import {
     Alert,
     FlatList,
     Image,
+    Linking,
+    Platform,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -24,6 +26,7 @@ interface UserProfile {
     lastName: string;
     email: string;
     phone?: string;
+    bio?: string;
     avatar?: string;
     createdAt: string;
     propertiesCount: number;
@@ -127,89 +130,93 @@ const createStyles = (screenWidth: number) => {
         profileHeader: {
             backgroundColor: '#5585b5',
             paddingHorizontal: 24,
-            paddingVertical: 32,
+            paddingVertical: 40,
+            paddingBottom: 40,
             borderBottomWidth: 0,
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 4 },
             shadowOpacity: 0.15,
             shadowRadius: 8,
             elevation: 5,
+            alignItems: 'center',
         },
         profileHeaderTop: {
-            flexDirection: 'row',
-            alignItems: 'flex-start',
-            marginBottom: 0,
-            gap: 16,
+            // Removed - no longer used in JSX
         },
         profileAvatar: {
-            fontSize: 45,
-            width: 80,
-            height: 80,
-            borderRadius: 40,
+            fontSize: 56,
+            width: 110,
+            height: 110,
+            borderRadius: 55,
             backgroundColor: 'rgba(255, 255, 255, 0.2)',
-            borderWidth: 3,
-            borderColor: 'rgba(255, 255, 255, 0.4)',
+            borderWidth: 4,
+            borderColor: 'rgba(255, 255, 255, 0.5)',
             textAlign: 'center',
             textAlignVertical: 'center',
-            lineHeight: 80,
+            lineHeight: 110,
         },
         profileAvatarImage: {
-            width: 80,
-            height: 80,
-            borderRadius: 40,
+            width: 110,
+            height: 110,
+            borderRadius: 55,
             backgroundColor: 'rgba(255, 255, 255, 0.2)',
-            borderWidth: 3,
-            borderColor: 'rgba(255, 255, 255, 0.4)',
+            borderWidth: 4,
+            borderColor: 'rgba(255, 255, 255, 0.5)',
         },
         profileInfo: {
-            flex: 1,
             justifyContent: 'center',
+            alignItems: 'center',
+            width: '100%',
         },
         profileName: {
-            fontSize: 24,
+            fontSize: 26,
             fontWeight: '900',
             color: '#ffffff',
-            marginBottom: 6,
+            marginBottom: 8,
             letterSpacing: -0.5,
+            textAlign: 'center',
         },
         profileEmail: {
             fontSize: 13,
-            color: '#d0d7ff',
+            color: 'rgba(255, 255, 255, 0.85)',
             fontWeight: '500',
             marginBottom: 3,
+            textAlign: 'center',
+            textDecorationLine: 'underline',
         },
         profilePhone: {
             fontSize: 13,
-            color: '#d0d7ff',
+            color: 'rgba(255, 255, 255, 0.85)',
             fontWeight: '500',
+            textAlign: 'center',
         },
         statsContainer: {
             flexDirection: 'row',
             justifyContent: 'space-between',
-            gap: 12,
+            gap: 10,
             paddingHorizontal: 16,
             paddingVertical: 20,
             backgroundColor: '#ffffff',
-            marginTop: -16,
+            marginTop: -30,
             marginHorizontal: 16,
             borderRadius: 16,
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.08,
             shadowRadius: 4,
-            elevation: 2,
+            elevation: 3,
         },
         statCard: {
             flex: 1,
             backgroundColor: '#f8f9ff',
             borderRadius: 12,
-            padding: 14,
+            padding: 16,
             alignItems: 'center',
             borderWidth: 1.5,
             borderColor: '#e8ecff',
         },
         statValue: {
-            fontSize: 22,
+            fontSize: 24,
             fontWeight: '900',
             color: '#5585b5',
             marginBottom: 4,
@@ -224,6 +231,36 @@ const createStyles = (screenWidth: number) => {
             fontSize: 11,
             color: '#f59e0b',
             marginTop: 2,
+        },
+        bioSection: {
+            paddingHorizontal: 16,
+            paddingVertical: 20,
+            backgroundColor: '#ffffff',
+            marginHorizontal: 16,
+            marginTop: 16,
+            borderRadius: 16,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.08,
+            shadowRadius: 4,
+            elevation: 2,
+        },
+        bioLabel: {
+            fontSize: 14,
+            fontWeight: '600',
+            color: '#5585b5',
+            marginBottom: 8,
+        },
+        bioText: {
+            fontSize: 15,
+            color: '#475569',
+            lineHeight: 24,
+            fontWeight: '400',
+        },
+        emptyBioText: {
+            fontSize: 15,
+            color: '#94a3b8',
+            fontStyle: 'italic',
         },
         // Grid
         gridContainer: {
@@ -335,6 +372,33 @@ const createStyles = (screenWidth: number) => {
         paginationButtonTextActive: {
             color: '#ffffff',
         },
+        // Contact Buttons
+        contactButtonsContainer: {
+            paddingHorizontal: 16,
+            paddingVertical: 16,
+            marginHorizontal: 16,
+            marginBottom: 16,
+        },
+        contactButton: {
+            backgroundColor: '#25d366',
+            borderRadius: 12,
+            paddingVertical: 14,
+            paddingHorizontal: 16,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.12,
+            shadowRadius: 4,
+            elevation: 3,
+        },
+        contactButtonText: {
+            color: '#ffffff',
+            fontSize: 14,
+            fontWeight: '600',
+        },
     });
 };
 
@@ -430,6 +494,81 @@ export default function PublicProfileScreen() {
         router.push(`/property-detail/${propertyId}`);
     };
 
+    const handleEmailPress = async () => {
+        if (!userProfile?.email) {
+            Alert.alert('Error', 'No hay correo disponible');
+            return;
+        }
+
+        const mailUrl = `mailto:${userProfile.email}`;
+
+        try {
+            const canOpen = await Linking.canOpenURL(mailUrl);
+            if (canOpen) {
+                await Linking.openURL(mailUrl);
+            } else {
+                Alert.alert('Error', 'No se puede abrir el cliente de correo');
+            }
+        } catch (error) {
+            Alert.alert('Error', 'No se pudo abrir el cliente de correo');
+        }
+    };
+
+    const handleContactWhatsApp = async () => {
+        if (!userProfile?.phone) {
+            Alert.alert('Error', 'No hay número de teléfono disponible');
+            return;
+        }
+
+        // Limpiar el número: remover espacios, guiones, paréntesis
+        const phoneNumber = userProfile.phone.replace(/[^\d+]/g, '');
+
+        // Construir URL de WhatsApp
+        const whatsappUrl = Platform.OS === 'web'
+            ? `https://web.whatsapp.com/send?phone=${phoneNumber}`
+            : `whatsapp://send?phone=${phoneNumber}`;
+
+        try {
+            const canOpen = await Linking.canOpenURL(whatsappUrl);
+            if (canOpen) {
+                await Linking.openURL(whatsappUrl);
+            } else {
+                // Si no tiene WhatsApp, ofrecer alternativa
+                Alert.alert(
+                    'WhatsApp no disponible',
+                    '¿Deseas llamar al usuario?',
+                    [
+                        { text: 'Cancelar', onPress: () => { }, style: 'cancel' },
+                        { text: 'Llamar', onPress: handleCall },
+                    ]
+                );
+            }
+        } catch (error) {
+            Alert.alert('Error', 'No se pudo abrir WhatsApp');
+        }
+    };
+
+    const handleCall = async () => {
+        if (!userProfile?.phone) {
+            Alert.alert('Error', 'No hay número de teléfono disponible');
+            return;
+        }
+
+        const phoneNumber = userProfile.phone.replace(/[^\d+]/g, '');
+        const callUrl = `tel:${phoneNumber}`;
+
+        try {
+            const canOpen = await Linking.canOpenURL(callUrl);
+            if (canOpen) {
+                await Linking.openURL(callUrl);
+            } else {
+                Alert.alert('Error', 'No se puede realizar llamadas en este dispositivo');
+            }
+        } catch (error) {
+            Alert.alert('Error', 'No se pudo hacer la llamada');
+        }
+    };
+
     const handleLoadMore = () => {
         if (currentPage < totalPages && !loadingMore) {
             loadProperties(currentPage + 1);
@@ -505,36 +644,38 @@ export default function PublicProfileScreen() {
                 {/* Profile Header Section */}
                 {userProfile && (
                     <View style={styles.profileHeader}>
-                        <View style={styles.profileHeaderTop}>
-                            {userProfile.avatar ? (
-                                buildAvatarUrl(userProfile.avatar) ? (
-                                    <Image
-                                        source={{ uri: buildAvatarUrl(userProfile.avatar)! }}
-                                        style={styles.profileAvatarImage}
-                                        onError={(e) => {
-                                            console.error('❌ Avatar load error:', {
-                                                originalAvatar: userProfile.avatar,
-                                                builtUrl: buildAvatarUrl(userProfile.avatar),
-                                                error: e.nativeEvent.error,
-                                            });
-                                        }}
-                                        onLoad={() => {
-                                            console.log('✅ Avatar loaded successfully:', buildAvatarUrl(userProfile.avatar));
-                                        }}
-                                    />
-                                ) : (
-                                    <Text style={styles.profileAvatar}>{userProfile.avatar}</Text>
-                                )
+                        {userProfile.avatar ? (
+                            buildAvatarUrl(userProfile.avatar) ? (
+                                <Image
+                                    source={{ uri: buildAvatarUrl(userProfile.avatar)! }}
+                                    style={styles.profileAvatarImage}
+                                    onError={(e) => {
+                                        console.error('❌ Avatar load error:', {
+                                            originalAvatar: userProfile.avatar,
+                                            builtUrl: buildAvatarUrl(userProfile.avatar),
+                                            error: e.nativeEvent.error,
+                                        });
+                                    }}
+                                    onLoad={() => {
+                                        console.log('✅ Avatar loaded successfully:', buildAvatarUrl(userProfile.avatar));
+                                    }}
+                                />
                             ) : (
-                                <Text style={styles.profileAvatar}>👤</Text>
+                                <Text style={styles.profileAvatar}>{userProfile.avatar}</Text>
+                            )
+                        ) : (
+                            <Text style={styles.profileAvatar}>👤</Text>
+                        )}
+                        <View style={styles.profileInfo}>
+                            <Text style={styles.profileName}>
+                                {userProfile.firstName} {userProfile.lastName}
+                            </Text>
+                            {userProfile.email && (
+                                <TouchableOpacity onPress={handleEmailPress} activeOpacity={0.7}>
+                                    <Text style={styles.profileEmail}>{userProfile.email}</Text>
+                                </TouchableOpacity>
                             )}
-                            <View style={styles.profileInfo}>
-                                <Text style={styles.profileName}>
-                                    {userProfile.firstName} {userProfile.lastName}
-                                </Text>
-                                {userProfile.email && <Text style={styles.profileEmail}>{userProfile.email}</Text>}
-                                {userProfile.phone && <Text style={styles.profilePhone}>{userProfile.phone}</Text>}
-                            </View>
+                            {userProfile.phone && <Text style={styles.profilePhone}>{userProfile.phone}</Text>}
                         </View>
                     </View>
                 )}
@@ -559,6 +700,30 @@ export default function PublicProfileScreen() {
                                 <Text style={styles.statRating}>⭐ {userProfile.averageRating.toFixed(1)}/5</Text>
                             )}
                         </View>
+                    </View>
+                )}
+
+                {/* Bio Section */}
+                {userProfile && (
+                    <View style={styles.bioSection}>
+                        <Text style={styles.bioLabel}>Acerca de mí</Text>
+                        <Text style={userProfile.bio ? styles.bioText : styles.emptyBioText}>
+                            {userProfile.bio || 'Este usuario aún no ha añadido información personal'}
+                        </Text>
+                    </View>
+                )}
+
+                {/* Contact Buttons */}
+                {userProfile && userProfile.phone && (
+                    <View style={styles.contactButtonsContainer}>
+                        <TouchableOpacity
+                            style={styles.contactButton}
+                            onPress={handleContactWhatsApp}
+                            activeOpacity={0.8}
+                        >
+                            <MaterialCommunityIcons name="whatsapp" size={20} color="#ffffff" />
+                            <Text style={styles.contactButtonText}>Contactar por WhatsApp</Text>
+                        </TouchableOpacity>
                     </View>
                 )}
 

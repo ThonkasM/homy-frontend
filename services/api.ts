@@ -90,15 +90,9 @@ class ApiService {
             };
         }
 
-        console.log('🔍 [handleResponse] Status:', response.status);
-        console.log('🔍 [handleResponse] OK?', response.ok);
-        console.log('🔍 [handleResponse] Data COMPLETA (raw):', JSON.stringify(data, null, 2));
-
         // Extraer datos si está envuelto en { success, data, timestamp }
         if (data?.success === true && data?.data !== undefined) {
-            console.log('✅ Respuesta envuelta detectada, extrayendo data...');
             data = data.data;
-            console.log('✅ Data extraída:', JSON.stringify(data, null, 2));
         }
 
         if (!response.ok) {
@@ -126,28 +120,16 @@ class ApiService {
 
     async login(payload: LoginPayload): Promise<AuthResponse> {
         try {
-            console.log('=== INICIANDO LOGIN ===');
-            console.log('URL:', `${API_BASE_URL}/auth/login`);
-            console.log('Payload:', JSON.stringify(payload, null, 2));
-
             const response = await fetch(`${API_BASE_URL}/auth/login`, {
                 method: 'POST',
                 headers: this.getHeaders(),
                 body: JSON.stringify(payload),
             });
 
-            console.log('Fetch completado, recibiendo respuesta...');
             const data = await this.handleResponse(response);
-
-            console.log('Datos finales recibidos en login():', JSON.stringify(data, null, 2));
-            console.log('accessToken existe?', !!data.accessToken);
-            console.log('user existe?', !!data.user);
-
             return data;
         } catch (error: any) {
-            console.error('❌ Login Error capturado:', error);
             const errorMessage = error?.message || 'Error de conexión. Verifica que el servidor esté corriendo en http://localhost:3000';
-            console.error('Mensaje final:', errorMessage);
             throw {
                 message: errorMessage,
                 statusCode: error?.statusCode || 0,
@@ -157,23 +139,13 @@ class ApiService {
 
     async register(payload: RegisterPayload): Promise<AuthResponse> {
         try {
-            console.log('=== INICIANDO REGISTRO ===');
-            console.log('URL:', `${API_BASE_URL}/auth/register`);
-            console.log('Payload:', JSON.stringify(payload, null, 2));
-
             const response = await fetch(`${API_BASE_URL}/auth/register`, {
                 method: 'POST',
                 headers: this.getHeaders(),
                 body: JSON.stringify(payload),
             });
 
-            console.log('Fetch completado, recibiendo respuesta...');
             const data = await this.handleResponse(response);
-
-            console.log('Datos finales recibidos en register():', JSON.stringify(data, null, 2));
-            console.log('accessToken existe?', !!data.accessToken);
-            console.log('user existe?', !!data.user);
-
             return data;
         } catch (error: any) {
             console.error('❌ Register Error capturado:', error);
@@ -535,15 +507,11 @@ class ApiService {
      */
     async getFavorites() {
         try {
-            console.log('⭐ [getFavorites] Obteniendo favoritos del usuario');
             const response = await fetch(`${API_BASE_URL}/favorites`, {
                 headers: this.getHeaders(),
             });
 
             const data = await this.handleResponse(response);
-            console.log('✅ Favoritos obtenidos:', {
-                count: data.favorites?.length,
-            });
             return data;
         } catch (error: any) {
             console.error('❌ Error obteniendo favoritos:', error);

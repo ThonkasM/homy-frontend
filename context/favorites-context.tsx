@@ -1,5 +1,6 @@
 import { apiService } from '@/services/api';
 import React, { createContext, useCallback, useContext, useState } from 'react';
+import { useAuth } from './auth-context';
 
 export interface Favorite {
     id: string;
@@ -38,9 +39,16 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const [favorites, setFavorites] = useState<Favorite[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const { isGuest } = useAuth();
 
     const fetchFavorites = useCallback(async () => {
         try {
+            // Si el usuario es invitado, no intentamos obtener favoritos
+            if (isGuest) {
+                setFavorites([]);
+                return [];
+            }
+
             setLoading(true);
             setError(null);
             const response = await apiService.getFavorites();
@@ -55,12 +63,11 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [isGuest]);
 
     const addFavorite = useCallback(async (propertyId: string) => {
         try {
             const response = await apiService.addFavorite(propertyId);
-            console.log('✅ Propiedad agregada a favoritos:', propertyId);
 
             // Actualizar estado global con el nuevo favorito
             if (response.favorite) {
@@ -83,7 +90,6 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const removeFavorite = useCallback(async (propertyId: string) => {
         try {
             const response = await apiService.removeFavorite(propertyId);
-            console.log('✅ Propiedad removida de favoritos:', propertyId);
 
             // Actualizar estado global
             setFavorites(prev => prev.filter(fav => fav.propertyId !== propertyId));

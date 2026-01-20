@@ -1,13 +1,21 @@
 import { CURRENCIES } from '@/config/currencies.config';
 import { validateAmenities, validateSpecifications } from '@/config/property-types.config';
+import { useAuth } from '@/context/auth-context';
 import { usePropertyTypeConfig } from '@/hooks/use-property-type-config';
 import { apiService, SERVER_BASE_URL } from '@/services/api';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, Platform, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+// Interface para items de media (imágenes y videos)
+interface MediaItem {
+  uri: string;
+  type: 'image' | 'video';
+  duration?: number; // duración en segundos para videos
+}
 
 const createStyles = (width: number) => {
   const isWeb = width > 768;
@@ -205,6 +213,29 @@ const createStyles = (width: number) => {
       color: '#64748b',
       marginBottom: 12,
       fontWeight: '500',
+    },
+    mediaOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.3)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    playButtonSmall: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: '#5585b5',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    playButtonText: {
+      color: '#ffffff',
+      fontSize: 20,
+      fontWeight: '700',
     },
     submitButton: {
       width: '100%',
@@ -458,7 +489,37 @@ export default function CreatePostScreen() {
   const { width } = useWindowDimensions();
   const styles = createStyles(width);
   const router = useRouter();
+  const { isGuest } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const alertShownRef = useRef(false);
+
+  // Proteger ruta si es invitado - Usar useFocusEffect para que se ejecute cada vez que la pantalla recibe el foco
+  useFocusEffect(
+    useCallback(() => {
+      if (isGuest && !alertShownRef.current) {
+        alertShownRef.current = true;
+        Alert.alert(
+          'Acceso Restringido',
+          'Debes iniciar sesión para crear publicaciones',
+          [
+            {
+              text: 'Iniciar Sesión',
+              onPress: () => router.push('/login'),
+              style: 'default',
+            },
+            {
+              text: 'Cancelar',
+              onPress: () => {
+                alertShownRef.current = false;
+                router.back();
+              },
+              style: 'cancel',
+            },
+          ]
+        );
+      }
+    }, [isGuest, router])
+  );
 
   // Estado principal del formulario
   const [formData, setFormData] = useState({
@@ -477,11 +538,20 @@ export default function CreatePostScreen() {
     specifications: {} as Record<string, any>,
   });
 
-  const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [selectedMedia, setSelectedMedia] = useState<MediaItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+
+  // Función helper para ordenar medios: imágenes primero, videos al final
+  const sortMediaItems = (media: MediaItem[]): MediaItem[] => {
+    return [...media].sort((a, b) => {
+      if (a.type === 'image' && b.type === 'video') return -1;
+      if (a.type === 'video' && b.type === 'image') return 1;
+      return 0;
+    });
+  };
 
   // Cargar configuración dinámica del tipo de propiedad
   const { config: propertyConfig } = usePropertyTypeConfig(formData.propertyType);
@@ -548,41 +618,69 @@ export default function CreatePostScreen() {
     if (!hasPermission) return;
 
     try {
-      // Calcular límite restante de imágenes
-      const remainingSlots = 5 - selectedImages.length;
+      // Calcular límite restante: máx 10 archivos totales
+      const remainingSlots = 10 - selectedMedia.length;
+      const videoCount = selectedMedia.filter(m => m.type === 'video').length;
+      const canAddVideos = videoCount < 3; // máx 3 videos
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ['images', 'videos'],
         allowsMultipleSelection: true,
         selectionLimit: remainingSlots > 0 ? remainingSlots : 1,
         aspect: [4, 3],
         quality: 0.8,
+        videoMaxDuration: 300, // máx 5 minutos
       });
 
       if (!result.canceled) {
-        const newImages = result.assets.map(asset => asset.uri);
+        let newMedia: MediaItem[] = [];
+        let videoCountInSelection = 0;
 
-        // Validar que no exceda el límite
-        if (selectedImages.length + newImages.length > 5) {
-          const excessCount = (selectedImages.length + newImages.length) - 5;
+        for (const asset of result.assets) {
+          const isVideo = asset.type === 'video';
+          if (isVideo) videoCountInSelection++;
+
+          newMedia.push({
+            uri: asset.uri,
+            type: isVideo ? 'video' : 'image',
+            duration: asset.duration || undefined,
+          });
+        }
+
+        // Validar cantidad de videos
+        if (videoCountInSelection + videoCount > 3) {
+          Alert.alert(
+            'Límite de videos',
+            `Máximo 3 videos permitidos. Ya tienes ${videoCount} video${videoCount !== 1 ? 's' : ''}.`
+          );
+          // Filtrar solo videos que excedan el límite
+          newMedia = newMedia.filter(m => m.type !== 'video' || videoCount < 3);
+        }
+
+        // Validar límite total
+        if (selectedMedia.length + newMedia.length > 10) {
           Alert.alert(
             'Límite alcanzado',
-            `Solo puedes agregar ${remainingSlots} más imagen${remainingSlots !== 1 ? 's' : ''}. Seleccionaste ${newImages.length}.`
+            `Solo puedes agregar ${remainingSlots} más archivo${remainingSlots !== 1 ? 's' : ''}. Seleccionaste ${result.assets.length}.`
           );
-          // Agregar solo las que caben
-          const allowedImages = newImages.slice(0, remainingSlots);
-          if (allowedImages.length > 0) {
-            setSelectedImages(prev => [...prev, ...allowedImages]);
+          // Agregar solo los que caben
+          const allowedMedia = newMedia.slice(0, remainingSlots);
+          if (allowedMedia.length > 0) {
+            setSelectedMedia(prev => sortMediaItems([...prev, ...allowedMedia]));
           }
           return;
         }
 
-        setSelectedImages(prev => [...prev, ...newImages]);
-        console.log(`✅ ${newImages.length} imagen(es) agregada(s)`);
+        if (newMedia.length > 0) {
+          setSelectedMedia(prev => sortMediaItems([...prev, ...newMedia]));
+          const imageCount = newMedia.filter(m => m.type === 'image').length;
+          const vCount = newMedia.filter(m => m.type === 'video').length;
+          console.log(`✅ Agregados: ${imageCount} imagen(es) y ${vCount} video(s)`);
+        }
       }
     } catch (error) {
-      console.error('Error picking images:', error);
-      Alert.alert('Error', 'No se pudieron seleccionar las imágenes');
+      console.error('Error picking media:', error);
+      Alert.alert('Error', 'No se pudo seleccionar el contenido');
     }
   };
 
@@ -599,11 +697,12 @@ export default function CreatePostScreen() {
 
       if (!result.canceled) {
         const newImage = result.assets[0].uri;
-        if (selectedImages.length >= 5) {
-          Alert.alert('Límite alcanzado', 'Puedes seleccionar máximo 5 imágenes');
+        if (selectedMedia.length >= 10) {
+          Alert.alert('Límite alcanzado', 'Máximo 10 archivos permitidos');
           return;
         }
-        setSelectedImages(prev => [...prev, newImage]);
+        setSelectedMedia(prev => sortMediaItems([...prev, { uri: newImage, type: 'image' }]));
+        console.log('✅ Foto capturada');
       }
     } catch (error) {
       console.error('Error taking photo:', error);
@@ -611,8 +710,8 @@ export default function CreatePostScreen() {
     }
   };
 
-  const removeImage = (index: number) => {
-    setSelectedImages(prev => prev.filter((_, i) => i !== index));
+  const removeMedia = (index: number) => {
+    setSelectedMedia(prev => prev.filter((_, i) => i !== index));
   };
 
   const showImageOptions = () => {
@@ -629,22 +728,28 @@ export default function CreatePostScreen() {
     const files = event.target.files;
     if (!files) return;
 
-    const newImages: string[] = [];
-    for (let i = 0; i < Math.min(files.length, 5); i++) {
+    const newMedia: MediaItem[] = [];
+    for (let i = 0; i < Math.min(files.length, 10); i++) {
       const file = files[i];
+      const isVideo = file.type.startsWith('video/');
       const reader = new FileReader();
 
       reader.onload = (e: any) => {
         const uri = e.target.result;
-        newImages.push(uri);
+        newMedia.push({
+          uri,
+          type: isVideo ? 'video' : 'image',
+        });
 
-        if (newImages.length === i + 1) {
-          if (selectedImages.length + newImages.length > 5) {
-            Alert.alert('Límite alcanzado', 'Puedes seleccionar máximo 5 imágenes');
+        if (newMedia.length === i + 1) {
+          if (selectedMedia.length + newMedia.length > 10) {
+            Alert.alert('Límite alcanzado', 'Máximo 10 archivos permitidos');
             return;
           }
-          setSelectedImages(prev => [...prev, ...newImages]);
-          console.log('✅ Imágenes agregadas desde web:', newImages.length);
+          setSelectedMedia(prev => sortMediaItems([...prev, ...newMedia]));
+          const imageCount = newMedia.filter(m => m.type === 'image').length;
+          const videoCount = newMedia.filter(m => m.type === 'video').length;
+          console.log(`✅ Agregados desde web: ${imageCount} imagen(es) y ${videoCount} video(s)`);
         }
       };
 
@@ -661,8 +766,8 @@ export default function CreatePostScreen() {
       return;
     }
 
-    if (selectedImages.length === 0) {
-      Alert.alert('Error', 'Debes agregar al menos una imagen');
+    if (selectedMedia.length === 0) {
+      Alert.alert('Error', 'Debes agregar al menos una imagen o video');
       return;
     }
 
@@ -725,21 +830,25 @@ export default function CreatePostScreen() {
       console.log('   PostStatus a enviar:', postStatus);
       console.log('   Specifications:', formData.specifications);
       console.log('   Amenities:', formData.amenities);
-      console.log('   Imágenes:', selectedImages.length);
+      console.log('   Media items:', selectedMedia.length);
 
-      console.log('📸 [handlePublish] Preparando', selectedImages.length, 'imágenes con postStatus:', postStatus);
-      selectedImages.forEach((imageUri, index) => {
-        const filename = imageUri.split('/').pop() || `image_${index}`;
+      console.log('📸 [handlePublish] Preparando', selectedMedia.length, 'archivos con postStatus:', postStatus);
+      selectedMedia.forEach((media, index) => {
+        const filename = media.uri.split('/').pop() || `${media.type}_${index}`;
+        const isVideo = media.type === 'video';
         const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : 'image/jpeg';
+        const extension = match ? match[1] : (isVideo ? 'mp4' : 'jpeg');
+        const mimeType = isVideo ? `video/${extension}` : `image/${extension}`;
 
-        console.log(`   Imagen ${index + 1}:`, { filename, type, uri: imageUri });
+        console.log(`   ${isVideo ? 'Video' : 'Imagen'} ${index + 1}:`, { filename, mimeType, uri: media.uri });
 
         // @ts-ignore
-        data.append('images', {
-          uri: imageUri,
+        // ✅ IMPORTANTE: Usar 'files' como nombre de campo (no 'images' o 'media')
+        // El backend espera exactamente este nombre en FilesInterceptor
+        data.append('files', {
+          uri: media.uri,
           name: filename,
-          type: type,
+          type: mimeType,
         });
       });
       console.log('✅ [handlePublish] FormData completado, enviando al API...');
@@ -780,7 +889,7 @@ export default function CreatePostScreen() {
               amenities: [],
               specifications: {},
             });
-            setSelectedImages([]);
+            setSelectedMedia([]);
             // Redirigir a perfil con refresh automático
             router.push('/(tabs)/profile?refresh=true');
           },
@@ -811,7 +920,7 @@ export default function CreatePostScreen() {
         />
       )}
 
-      {/* Modal para seleccionar fotos */}
+      {/* Modal para seleccionar fotos o videos */}
       <Modal
         visible={showImageModal}
         transparent
@@ -822,8 +931,8 @@ export default function CreatePostScreen() {
           <View style={styles.imageOptionsContainer}>
             {/* Header */}
             <View style={styles.imageOptionsHeader}>
-              <Text style={styles.imageOptionsTitle}>Agregar Fotos</Text>
-              <Text style={styles.imageOptionsSubtitle}>Elige cómo deseas agregar una foto</Text>
+              <Text style={styles.imageOptionsTitle}>Agregar Contenido</Text>
+              <Text style={styles.imageOptionsSubtitle}>Fotos o videos de tu propiedad</Text>
             </View>
 
             {/* Opciones */}
@@ -851,7 +960,7 @@ export default function CreatePostScreen() {
               <View style={styles.imageOptionIcon}>
                 <MaterialCommunityIcons name="image-multiple" size={20} color="#ffffff" />
               </View>
-              <Text style={styles.imageOptionText}>Seleccionar de Galería</Text>
+              <Text style={styles.imageOptionText}>Fotos o Videos</Text>
               <MaterialCommunityIcons name="chevron-right" size={20} color="#5585b5" />
             </TouchableOpacity>
 
@@ -1225,14 +1334,21 @@ export default function CreatePostScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Fotos</Text>
 
-              {selectedImages.length > 0 && (
+              {selectedMedia.length > 0 && (
                 <View style={styles.imagesGrid}>
-                  {selectedImages.map((imageUri, index) => (
+                  {selectedMedia.map((media, index) => (
                     <View key={index} style={styles.imageContainer}>
-                      <Image source={{ uri: imageUri }} style={styles.selectedImage} />
+                      <Image source={{ uri: media.uri }} style={styles.selectedImage} />
+                      {media.type === 'video' && (
+                        <View style={styles.mediaOverlay}>
+                          <View style={styles.playButtonSmall}>
+                            <Text style={styles.playButtonText}>▶</Text>
+                          </View>
+                        </View>
+                      )}
                       <TouchableOpacity
                         style={styles.removeImageButton}
-                        onPress={() => removeImage(index)}
+                        onPress={() => removeMedia(index)}
                       >
                         <Text style={styles.removeImageText}>✕</Text>
                       </TouchableOpacity>
@@ -1242,16 +1358,21 @@ export default function CreatePostScreen() {
               )}
 
               <Text style={styles.imageCounter}>
-                {selectedImages.length}/5 imágenes seleccionadas
+                {selectedMedia.length}/10 archivo{selectedMedia.length !== 1 ? 's' : ''} seleccionado{selectedMedia.length !== 1 ? 's' : ''}
+                {selectedMedia.length > 0 && (
+                  <Text style={{ color: '#7c3aed' }}>
+                    {' '}({selectedMedia.filter(m => m.type === 'image').length} imagen{selectedMedia.filter(m => m.type === 'image').length !== 1 ? 'es' : ''}, {selectedMedia.filter(m => m.type === 'video').length} video{selectedMedia.filter(m => m.type === 'video').length !== 1 ? 's' : ''})
+                  </Text>
+                )}
               </Text>
 
               <TouchableOpacity
                 style={styles.uploadButton}
                 onPress={showImageOptions}
-                disabled={selectedImages.length >= 5}
+                disabled={selectedMedia.length >= 10}
               >
                 <Text style={styles.uploadText}>
-                  {selectedImages.length >= 5 ? '✓ Máximo alcanzado' : '+ Agregar Fotos'}
+                  {selectedMedia.length >= 10 ? '✓ Máximo alcanzado' : '+ Agregar Fotos o Videos'}
                 </Text>
               </TouchableOpacity>
             </View>

@@ -6,8 +6,8 @@ import { SERVER_BASE_URL } from '@/services/api';
 import { uploadService } from '@/services/upload-service';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -422,11 +422,121 @@ const createStyles = (width: number) => {
       borderRadius: 8,
       backgroundColor: 'rgba(255, 255, 255, 0.15)',
     },
+    bioCardSection: {
+      backgroundColor: '#ffffff',
+      borderRadius: 16,
+      padding: 20,
+      marginHorizontal: 16,
+      marginVertical: 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    bioLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#5585b5',
+      marginBottom: 8,
+    },
+    bioText: {
+      fontSize: 15,
+      color: '#475569',
+      lineHeight: 24,
+      fontWeight: '400',
+    },
+    emptyBioText: {
+      fontSize: 15,
+      color: '#94a3b8',
+      fontStyle: 'italic',
+    },
+    // ============================================
+    // EDIT PROFILE MODAL STYLES
+    // ============================================
+    editProfileModalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'flex-end',
+    },
+    editProfileModalContent: {
+      backgroundColor: '#ffffff',
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingHorizontal: 24,
+      paddingTop: 24,
+      paddingBottom: 32,
+    },
+    editProfileModalHeader: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: '#5585b5',
+      marginBottom: 20,
+    },
+    editProfileLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#475569',
+      marginBottom: 8,
+      marginTop: 16,
+    },
+    editProfileInput: {
+      borderWidth: 1,
+      borderColor: '#cbd5e1',
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: '#0f172a',
+      marginBottom: 16,
+      backgroundColor: '#f8fafc',
+    },
+    editProfileInputMultiline: {
+      borderWidth: 1,
+      borderColor: '#cbd5e1',
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: '#0f172a',
+      marginBottom: 16,
+      backgroundColor: '#f8fafc',
+      minHeight: 100,
+      textAlignVertical: 'top',
+    },
+    editProfileButtonContainer: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: 20,
+    },
+    editProfileButton: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    editProfileButtonSave: {
+      backgroundColor: '#5585b5',
+    },
+    editProfileButtonCancel: {
+      backgroundColor: '#e2e8f0',
+    },
+    editProfileButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    editProfileButtonTextSave: {
+      color: '#ffffff',
+    },
+    editProfileButtonTextCancel: {
+      color: '#64748b',
+    },
   });
 };
 
 export default function ProfileScreen() {
-  const { user, logout, token, updateUser } = useAuth();
+  const { user, logout, token, updateUser, isGuest } = useAuth();
   const { properties, loading, error, fetchUserProperties, deleteProperty, archiveProperty } = useProperties();
   const { favorites, fetchFavorites, removeFavorite } = useFavoritesContext();
   const { width } = useWindowDimensions();
@@ -440,6 +550,35 @@ export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState<'properties' | 'favorites'>('properties');
   const [showMenu, setShowMenu] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+  const alertShownRef = useRef(false);
+
+  // Proteger ruta si es invitado - Usar useFocusEffect para que se ejecute cada vez que la pantalla recibe el foco
+  useFocusEffect(
+    useCallback(() => {
+      if (isGuest && !alertShownRef.current) {
+        alertShownRef.current = true;
+        Alert.alert(
+          'Acceso Restringido',
+          'Debes iniciar sesión para acceder a tu perfil',
+          [
+            {
+              text: 'Iniciar Sesión',
+              onPress: () => router.push('/login'),
+              style: 'default',
+            },
+            {
+              text: 'Cancelar',
+              onPress: () => {
+                alertShownRef.current = false;
+                router.back();
+              },
+              style: 'cancel',
+            },
+          ]
+        );
+      }
+    }, [isGuest, router])
+  );
 
   const buildAvatarUrl = (avatarPath: string | undefined) => {
     if (!avatarPath) {
@@ -532,14 +671,12 @@ export default function ProfileScreen() {
           });
           if (response.ok) {
             const data = await response.json();
-            console.log('📥 Respuesta del perfil:', JSON.stringify(data, null, 2));
 
             // El backend devuelve { data: {...}, success: true, timestamp: "..." }
             const updatedUser = data.data || data.user || data;
 
             if (updatedUser && updatedUser.email) {
               await updateUser(updatedUser);
-              console.log('✅ Usuario actualizado:', updatedUser.email);
             } else {
               console.warn('⚠️ Respuesta incompleta del perfil:', data);
             }
@@ -627,6 +764,56 @@ export default function ProfileScreen() {
     );
   };
 
+  const handleEditProfilePress = () => {
+    router.push('/edit-profile');
+    setShowMenu(false);
+  };
+
+  const handleViewPublicProfile = () => {
+    if (user?.id) {
+      router.push(`/profile/${user.id}`);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      setUpdatingProfile(true);
+
+      if (!token) {
+        throw new Error('No hay sesión activa');
+      }
+
+      const response = await fetch(`${SERVER_BASE_URL}/api/auth/profile`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          bio: editingBio,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Error actualizando perfil');
+      }
+
+      const data = await response.json();
+
+      const updatedUser = data.data || data.user || data;
+      if (updatedUser && updatedUser.email) {
+        await updateUser(updatedUser);
+        Alert.alert('Éxito', 'Tu perfil ha sido actualizado');
+        setShowEditProfileModal(false);
+      }
+    } catch (err: any) {
+      console.error('Error al actualizar perfil:', err);
+      Alert.alert('Error', err.message || 'No pudimos actualizar tu perfil');
+    } finally {
+      setUpdatingProfile(false);
+    }
+  };
+
   const renderPropertyCard = (property: Property) => {
     const imageUrl = property.images?.[0]?.url;
     const buildImageUrl = (imagePath: string | undefined) => {
@@ -653,8 +840,17 @@ export default function ProfileScreen() {
       setModalVisible(true);
     };
 
+    const handleViewProperty = () => {
+      router.push(`/property-detail/${property.id}`);
+    };
+
     return (
-      <View key={property.id} style={styles.propertyCard}>
+      <TouchableOpacity
+        key={property.id}
+        style={styles.propertyCard}
+        onPress={handleViewProperty}
+        activeOpacity={0.8}
+      >
         {/* Imagen */}
         <View style={styles.propertyImageContainer}>
           {fullImageUrl ? (
@@ -683,11 +879,14 @@ export default function ProfileScreen() {
         {/* Botón de opciones */}
         <TouchableOpacity
           style={styles.propertyOptionsButton}
-          onPress={openOptionsModal}
+          onPress={(e) => {
+            e.stopPropagation();
+            openOptionsModal();
+          }}
         >
           <MaterialCommunityIcons name="dots-vertical" size={24} color="#5585b5" />
         </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -811,9 +1010,11 @@ export default function ProfileScreen() {
               </View>
             </TouchableOpacity>
             <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>
-                {user?.firstName || 'Usuario'} {user?.lastName || ''}
-              </Text>
+              <TouchableOpacity onPress={handleViewPublicProfile} activeOpacity={0.7}>
+                <Text style={styles.profileName}>
+                  {user?.firstName || 'Usuario'} {user?.lastName || ''}
+                </Text>
+              </TouchableOpacity>
               {user?.email && <Text style={styles.profileEmail}>{user?.email}</Text>}
               {user?.phone && <Text style={styles.profilePhone}>{user?.phone}</Text>}
             </View>
@@ -842,6 +1043,16 @@ export default function ProfileScreen() {
             <Text style={styles.statLabel}>Rating</Text>
           </View>
         </View>
+
+        {/* Bio Section */}
+        {user && (
+          <View style={styles.bioCardSection}>
+            <Text style={styles.bioLabel}>Acerca de mí</Text>
+            <Text style={user.bio ? styles.bioText : styles.emptyBioText}>
+              {user.bio || 'Cuéntanos sobre ti añadiendo una biografía desde el menú'}
+            </Text>
+          </View>
+        )}
 
         {/* Tabs */}
         <View style={styles.tabsContainer}>
@@ -1040,6 +1251,15 @@ export default function ProfileScreen() {
               <Text style={styles.menuOptionText}>Archivados</Text>
             </TouchableOpacity>
 
+            {/* Editar Perfil */}
+            <TouchableOpacity
+              style={styles.menuOption}
+              onPress={handleEditProfilePress}
+            >
+              <MaterialCommunityIcons name="account-edit" size={20} color="#5585b5" />
+              <Text style={styles.menuOptionText}>Editar Perfil</Text>
+            </TouchableOpacity>
+
             {/* Cerrar Sesión */}
             <TouchableOpacity
               style={[styles.menuOption, styles.menuOptionLogout]}
@@ -1055,6 +1275,7 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
     </SafeAreaView>
   );
 }

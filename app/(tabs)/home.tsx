@@ -218,15 +218,20 @@ const PropertyCard = ({
 const createStyles = (width: number) => {
   const isWeb = width > 768;
   const isMobile = width <= 768;
+  const maxWidth = isWeb ? 600 : '100%' as any;
+  const cardWidth = isMobile ? Dimensions.get('window').width - 16 : Math.min(width * 0.9, 600);
 
   return StyleSheet.create({
     safeContainer: {
       flex: 1,
       backgroundColor: '#ffffff',
+      alignItems: 'center',
     },
     container: {
       flex: 1,
       width: '100%',
+      maxWidth: maxWidth as any,
+      alignSelf: 'center',
     },
     // Header - Minimal y elegante
     headerContainer: {
@@ -237,6 +242,8 @@ const createStyles = (width: number) => {
       borderBottomWidth: 1,
       borderBottomColor: '#e2e8f0',
       width: '100%',
+      maxWidth: maxWidth as any,
+      alignSelf: 'center',
     },
     headerTitle: {
       fontSize: 28,
@@ -244,6 +251,11 @@ const createStyles = (width: number) => {
       color: '#5585b5',
       marginBottom: 12,
       letterSpacing: -0.5,
+    },
+    headerLogo: {
+      height: 40,
+      width: 120,
+      marginBottom: 12,
     },
     searchContainer: {
       flexDirection: 'row',
@@ -270,14 +282,16 @@ const createStyles = (width: number) => {
     feedContainer: {
       flex: 1,
       width: '100%',
+      maxWidth: maxWidth as any,
+      alignSelf: 'center',
       backgroundColor: '#f9fafb',
       paddingVertical: isMobile ? 12 : 16,
     },
     // Tarjeta de propiedad - Full width, tipo story
     propertyCard: {
-      width: isMobile ? Dimensions.get('window').width - 16 : '90%' as any,
+      width: cardWidth,
       marginVertical: isMobile ? 12 : 16,
-      marginHorizontal: isMobile ? 8 : '5%' as any,
+      marginHorizontal: 'auto',
       borderRadius: isMobile ? 16 : 20,
       overflow: 'hidden',
       backgroundColor: '#ffffff',
@@ -655,7 +669,7 @@ const createStyles = (width: number) => {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const { properties, loading, error, fetchProperties } = useProperties();
   const { favorites, fetchFavorites, addFavorite, removeFavorite } = useFavoritesContext();
   const [searchQuery, setSearchQuery] = useState('');
@@ -730,7 +744,6 @@ export default function HomeScreen() {
 
   const loadFavorites = async () => {
     try {
-      console.log('[HomeScreen] Cargando favoritos...');
       await fetchFavorites();
     } catch (err) {
       console.error('[HomeScreen] Error cargando favoritos:', err);
@@ -739,12 +752,7 @@ export default function HomeScreen() {
 
   const loadProperties = async () => {
     try {
-      console.log('[HomeScreen] Iniciando carga de propiedades...');
-      const result = await fetchProperties({ page: 1, limit: 20 });
-      console.log('[HomeScreen] Propiedades cargadas:', {
-        total: result?.pagination?.total,
-        count: result?.properties?.length,
-      });
+      await fetchProperties({ page: 1, limit: 20 });
     } catch (err) {
       console.error('Error loading properties:', err);
     }
@@ -789,14 +797,25 @@ export default function HomeScreen() {
 
   const handleLike = async (propertyId: string, e: any) => {
     e.stopPropagation();
+
+    if (isGuest) {
+      Alert.alert(
+        'Acceso Restringido',
+        'Debes iniciar sesión para guardar favoritos',
+        [
+          { text: 'Iniciar Sesión', onPress: () => router.push('/login') },
+          { text: 'Cancelar', onPress: () => { } }
+        ]
+      );
+      return;
+    }
+
     try {
       if (likedProperties.has(propertyId)) {
         // Remove from favorites
-        console.log('[HomeScreen] Removiendo de favoritos:', propertyId);
         await removeFavorite(propertyId);
       } else {
         // Add to favorites
-        console.log('[HomeScreen] Añadiendo a favoritos:', propertyId);
         await addFavorite(propertyId);
       }
     } catch (err: any) {
@@ -954,7 +973,11 @@ ${deepLink}`;
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.headerContainer}>
-          <Text style={styles.headerTitle}>Ho-My</Text>
+          <Image
+            source={require('@/assets/logos/NormalLogo.jpeg')}
+            style={styles.headerLogo}
+            resizeMode="contain"
+          />
 
           <View style={styles.searchContainer}>
             <Text style={styles.searchIcon}>🔍</Text>

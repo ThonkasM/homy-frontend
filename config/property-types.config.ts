@@ -39,30 +39,6 @@ export const PROPERTY_TYPES_CONFIG: Record<string, PropertyTypeConfig> = {
         description: 'Unidad de vivienda en edificio',
         fields: [
             {
-                key: 'dormitorios',
-                label: 'Dormitorios',
-                type: 'number',
-                required: true,
-                min: 1,
-                max: 10,
-            },
-            {
-                key: 'baños',
-                label: 'Baños',
-                type: 'number',
-                required: true,
-                min: 1,
-                max: 10,
-            },
-            {
-                key: 'expensas',
-                label: 'Expensas (Bs.)',
-                type: 'decimal',
-                required: false,
-                min: 0,
-                unit: 'Bs.',
-            },
-            {
                 key: 'area',
                 label: 'Área Total',
                 type: 'decimal',
@@ -86,6 +62,32 @@ export const PROPERTY_TYPES_CONFIG: Record<string, PropertyTypeConfig> = {
                 min: 0,
                 max: 50,
             },
+            {
+                
+                key: 'dormitorios',
+                label: 'Dormitorios',
+                type: 'number',
+                required: true,
+                min: 1,
+                max: 10,
+            },
+            {
+                key: 'baños',
+                label: 'Baños',
+                type: 'number',
+                required: true,
+                min: 1,
+                max: 10,
+            },
+            {
+                key: 'expensas',
+                label: 'Expensas (Bs.)',
+                type: 'decimal',
+                required: false,
+                min: 0,
+                unit: 'Bs.',
+            },
+           
             {
                 key: 'garage',
                 label: 'Tiene garage',
@@ -112,22 +114,6 @@ export const PROPERTY_TYPES_CONFIG: Record<string, PropertyTypeConfig> = {
         description: 'Vivienda unifamiliar',
         fields: [
             {
-                key: 'dormitorios',
-                label: 'Dormitorios',
-                type: 'number',
-                required: true,
-                min: 1,
-                max: 10,
-            },
-            {
-                key: 'baños',
-                label: 'Baños',
-                type: 'number',
-                required: true,
-                min: 1,
-                max: 10,
-            },
-            {
                 key: 'area',
                 label: 'Área del Terreno',
                 type: 'decimal',
@@ -143,6 +129,23 @@ export const PROPERTY_TYPES_CONFIG: Record<string, PropertyTypeConfig> = {
                 min: 20,
                 unit: 'm²',
             },
+            {
+                key: 'dormitorios',
+                label: 'Dormitorios',
+                type: 'number',
+                required: true,
+                min: 1,
+                max: 10,
+            },
+            {
+                key: 'baños',
+                label: 'Baños',
+                type: 'number',
+                required: true,
+                min: 1,
+                max: 10,
+            },
+            
             {
                 key: 'garage',
                 label: 'Lugares de Garaje',

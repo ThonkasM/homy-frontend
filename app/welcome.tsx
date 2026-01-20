@@ -1,5 +1,6 @@
+import { useAuth } from '@/context/auth-context';
 import { useRouter } from "expo-router";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const styles = StyleSheet.create({
@@ -21,18 +22,22 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   logoContainer: {
-    width: 100,
-    height: 100,
+    width: 150,
+    height: 150,
     backgroundColor: '#f0f4ff',
-    borderRadius: 24,
+    borderRadius: 0,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
-    borderWidth: 2,
+    borderWidth: 0,
     borderColor: '#3b82f6',
   },
   logoText: {
     fontSize: 50,
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
   appName: {
     fontSize: 24,
@@ -173,19 +178,40 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
   },
-  dividerLine: {
-    height: 1,
-    backgroundColor: '#e2e8f0',
-    marginVertical: 16,
+  guestButton: {
+    backgroundColor: '#f1f5f9',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+  },
+  guestButtonText: {
+    color: '#64748b',
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
 });
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  
+  const { loginAsGuest } = useAuth();
+
+  const handleGuestLogin = async () => {
+    try {
+      await loginAsGuest();
+      router.replace('/(tabs)/home');
+    } catch (error) {
+      console.error('Error al iniciar como invitado:', error);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeContainer}>
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
@@ -193,10 +219,12 @@ export default function WelcomeScreen() {
           {/* Top Section - Logo & Brand */}
           <View style={styles.topSection}>
             <View style={styles.logoContainer}>
-              <Text style={styles.logoText}>🏡</Text>
+              <Image
+                source={require('@/assets/logos/BigLogo.jpeg')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
             </View>
-            <Text style={styles.appName}>HO{'\n'}MY</Text>
-            <Text style={styles.tagline}></Text>
           </View>
 
           {/* Hero Section */}
@@ -246,6 +274,14 @@ export default function WelcomeScreen() {
               onPress={() => router.push("/register")}
             >
               <Text style={styles.secondaryButtonText}>CREAR CUENTA</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.guestButton}
+              activeOpacity={0.8}
+              onPress={handleGuestLogin}
+            >
+              <Text style={styles.guestButtonText}>INICIAR COMO INVITADO</Text>
             </TouchableOpacity>
           </View>
 

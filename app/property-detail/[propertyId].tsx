@@ -5,9 +5,20 @@ import { Property } from '@/hooks/use-properties';
 import { apiService, SERVER_BASE_URL } from '@/services/api';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Image, Linking, Modal, Platform, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+// Interfaz para PropertyMedia (imágenes y videos)
+interface PropertyMedia {
+  id: string;
+  type: 'IMAGE' | 'VIDEO';
+  url: string;
+  thumbnailUrl?: string;
+  duration?: number;
+  order: number;
+}
 
 
 const createStyles = (screenWidth: number) => {
@@ -96,7 +107,7 @@ const createStyles = (screenWidth: number) => {
     paginationBadge: {
       position: 'absolute',
       bottom: 16,
-      right: 16,
+      left: 16,
       backgroundColor: 'rgba(0, 0, 0, 0.6)',
       paddingHorizontal: 12,
       paddingVertical: 6,
@@ -107,6 +118,56 @@ const createStyles = (screenWidth: number) => {
       color: '#ffffff',
       fontSize: 14,
       fontWeight: '600',
+    },
+    // Video overlay styles
+    videoOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    },
+    playButtonContainer: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 8,
+      elevation: 6,
+    },
+    videoDurationBadge: {
+      position: 'absolute',
+      bottom: 8,
+      right: 8,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 4,
+      zIndex: 5,
+    },
+    videoDurationText: {
+      color: '#ffffff',
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    // Fullscreen video styles
+    fullscreenVideoContainer: {
+      flex: 1,
+      backgroundColor: '#000000',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    fullscreenVideo: {
+      width: '100%',
+      height: '100%',
     },
     contentContainer: {
       paddingHorizontal: contentPadding,
@@ -561,18 +622,58 @@ const createStyles = (screenWidth: number) => {
   });
 };
 
+// Componente helper para reproducir videos con expo-video
+const VideoPlayerComponent = ({ uri, shouldPlay }: { uri: string; shouldPlay: boolean }) => {
+  const player = useVideoPlayer(uri, (player) => {
+    player.loop = false;
+    player.muted = false;
+  });
+
+  useEffect(() => {
+    if (shouldPlay) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [shouldPlay, player]);
+
+  return (
+    <VideoView
+      style={{
+        width: '100%',
+        height: '100%',
+      }}
+      player={player}
+      allowsPictureInPicture
+      fullscreenOptions={{
+        enable: true,
+        orientation: 'landscape',
+      }}
+    />
+  );
+};
+
 export default function PropertyDetailScreen() {
   const { width } = useWindowDimensions();
   const styles = createStyles(width);
   const router = useRouter();
   const { propertyId } = useLocalSearchParams() as { propertyId: string };
+
+  // 1. REFS - Todos los useRef juntos
   const scrollViewRef = useRef<ScrollView>(null);
+  const fullscreenScrollRef = useRef<ScrollView>(null);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  // 2. CONTEXT
   const { favorites, fetchFavorites, addFavorite, removeFavorite } = useFavoritesContext();
+
+  // 3. STATE - Todos los useState juntos
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [fullscreenImageIndex, setFullscreenImageIndex] = useState<number | null>(null);
+  const [videoError, setVideoError] = useState<string | null>(null);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [scrollOffset, setScrollOffset] = useState(0);
 
@@ -582,7 +683,8 @@ export default function PropertyDetailScreen() {
   // Límite de caracteres para descripción truncada
   const DESCRIPTION_LIMIT = 150;
 
-  const truncateDescription = (text: string, limit: number): { truncated: string; isTruncated: boolean } => {
+  // 4. CALLBACKS - Todos los useCallback juntos
+  const truncateDescription = useCallback((text: string, limit: number): { truncated: string; isTruncated: boolean } => {
     if (text.length > limit) {
       return {
         truncated: text.substring(0, limit).trim() + '...',
@@ -593,46 +695,23 @@ export default function PropertyDetailScreen() {
       truncated: text,
       isTruncated: false,
     };
-  };
+  }, []);
 
-  useEffect(() => {
-    loadProperty();
-    loadFavorites();
-  }, [propertyId]);
-
-  const loadProperty = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await apiService.getPropertyById(propertyId);
-      console.log('📍 Property loaded:', {
-        id: data.id,
-        title: data.title,
-        imagesCount: data.images?.length || 0,
-        images: data.images,
+  // Función para cerrar el modal fullscreen y sincronizar con el carrusel
+  const handleCloseFullscreenModal = useCallback(() => {
+    if (fullscreenImageIndex !== null) {
+      setCurrentImageIndex(fullscreenImageIndex);
+      // Scroll al carrusel en la misma posición
+      const scrollPosition = fullscreenImageIndex * (width > 768 ? 768 : width);
+      scrollViewRef.current?.scrollTo({
+        x: scrollPosition,
+        animated: false,
       });
-      setProperty(data);
-    } catch (err: any) {
-      console.error('Error loading property:', err);
-      setError(err.message || 'No se pudo cargar la propiedad');
-      Alert.alert('Error', 'No se pudo cargar los detalles de la propiedad');
-    } finally {
-      setLoading(false);
     }
-  };
+    setFullscreenImageIndex(null);
+  }, [fullscreenImageIndex, width]);
 
-  const loadFavorites = async () => {
-    try {
-      console.log('[PropertyDetail] Cargando favoritos...');
-      await fetchFavorites();
-    } catch (err) {
-      console.error('[PropertyDetail] Error cargando favoritos:', err);
-    }
-  };
-
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  const handleLike = async () => {
+  const handleLike = useCallback(async () => {
     // Animación de escala y rebote
     Animated.sequence([
       Animated.spring(scaleAnim, {
@@ -652,11 +731,9 @@ export default function PropertyDetailScreen() {
     try {
       if (isLiked) {
         // Remove from favorites
-        console.log('[PropertyDetail] Removiendo de favoritos:', propertyId);
         await removeFavorite(propertyId);
       } else {
         // Add to favorites
-        console.log('[PropertyDetail] Añadiendo a favoritos:', propertyId);
         await addFavorite(propertyId);
       }
     } catch (err: any) {
@@ -674,29 +751,222 @@ export default function PropertyDetailScreen() {
 
       Alert.alert('⚠️ Error', errorMessage);
     }
+  }, [isLiked, propertyId, removeFavorite, addFavorite]);
+
+  const handleScroll = useCallback((event: any) => {
+    const contentOffsetX = event.nativeEvent.contentOffset.x;
+    const currentIndex = Math.round(contentOffsetX / width);
+    setCurrentImageIndex(currentIndex);
+  }, [width]);
+
+  const handleMainScroll = useCallback((event: any) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    setScrollOffset(offsetY);
+  }, []);
+
+  const handlePrevImage = useCallback(() => {
+    const newIndex = Math.max(0, currentImageIndex - 1);
+    scrollViewRef.current?.scrollTo({
+      x: newIndex * (width > 768 ? 768 : width),
+      animated: true,
+    });
+    setCurrentImageIndex(newIndex);
+  }, [currentImageIndex, width]);
+
+  const handleNextImage = useCallback(() => {
+    if (property && property.images && property.images.length > 0) {
+      const maxIndex = property.images.length - 1;
+      const newIndex = Math.min(maxIndex, currentImageIndex + 1);
+      scrollViewRef.current?.scrollTo({
+        x: newIndex * (width > 768 ? 768 : width),
+        animated: true,
+      });
+      setCurrentImageIndex(newIndex);
+    }
+  }, [currentImageIndex, property, width]);
+
+  const buildAvatarUrl = useCallback((avatarPath: string | undefined) => {
+    if (!avatarPath) return null;
+    if (avatarPath.startsWith('http')) return avatarPath;
+    const cleanPath = avatarPath.startsWith('/') ? avatarPath : `/${avatarPath}`;
+    return `${SERVER_BASE_URL}${cleanPath}`;
+  }, []);
+
+  const handleCall = useCallback(async () => {
+    if (!property?.owner?.phone) {
+      Alert.alert('Error', 'No hay número de teléfono disponible');
+      return;
+    }
+
+    const phoneNumber = property.owner.phone.replace(/[^\d+]/g, '');
+    const callUrl = `tel:${phoneNumber}`;
+
+    try {
+      const canOpen = await Linking.canOpenURL(callUrl);
+      if (canOpen) {
+        await Linking.openURL(callUrl);
+      } else {
+        Alert.alert('Error', 'No se puede realizar llamadas en este dispositivo');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo hacer la llamada');
+    }
+  }, [property?.owner?.phone]);
+
+  const handleContactWhatsApp = useCallback(async () => {
+    if (!property?.owner?.phone) {
+      Alert.alert('Error', 'No hay número de teléfono disponible');
+      return;
+    }
+
+    // Limpiar el número: remover espacios, guiones, paréntesis
+    const phoneNumber = property.owner.phone.replace(/[^\d+]/g, '');
+
+    // Construir URL de WhatsApp
+    const whatsappUrl = Platform.OS === 'web'
+      ? `https://web.whatsapp.com/send?phone=${phoneNumber}`
+      : `whatsapp://send?phone=${phoneNumber}`;
+
+    try {
+      const canOpen = await Linking.canOpenURL(whatsappUrl);
+      if (canOpen) {
+        await Linking.openURL(whatsappUrl);
+      } else {
+        // Si no tiene WhatsApp, ofrecer alternativa
+        Alert.alert(
+          'WhatsApp no disponible',
+          '¿Deseas llamar al propietario?',
+          [
+            { text: 'Cancelar', onPress: () => { }, style: 'cancel' },
+            { text: 'Llamar', onPress: handleCall },
+          ]
+        );
+      }
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo abrir WhatsApp');
+    }
+  }, [property?.owner?.phone]);
+
+  // 🗺️ Abre selector nativo de apps de mapas
+  const handleOpenMap = useCallback(async (property: Property, e: any) => {
+    e.stopPropagation();
+    try {
+      const { latitude, longitude, title } = property;
+
+      if (!latitude || !longitude) {
+        Alert.alert('⚠️ Error', 'La propiedad no tiene coordenadas registradas');
+        return;
+      }
+
+      let mapUrl = '';
+
+      if (Platform.OS === 'ios') {
+        // iOS: URL http:// permite que otras apps compitan con Apple Maps
+        mapUrl = `http://maps.apple.com/?q=${latitude},${longitude}`;
+      } else {
+        // Android: geo: schema dispara selector nativo automáticamente
+        mapUrl = `geo:${latitude},${longitude}?q=${latitude},${longitude}(${encodeURIComponent(title)})`;
+      }
+
+      Linking.openURL(mapUrl).catch((err) => {
+        console.error('Error abriendo mapas:', err);
+
+        // Fallback: Si falla, intenta con URL web genérica
+        const fallbackUrl = `https://maps.google.com/maps?q=${latitude},${longitude}`;
+        Linking.openURL(fallbackUrl).catch(() => {
+          Alert.alert('Error', 'No se pudo abrir la aplicación de mapas');
+        });
+      });
+    } catch (error) {
+      console.error('Error abriendo mapas:', error);
+      Alert.alert('Error', 'No se pudo abrir la aplicación de mapas');
+    }
+  }, []);
+
+  // Construir URLs completas de imágenes y videos (ANTES de effects)
+  const propertyMedia: PropertyMedia[] = useMemo(() => {
+    if (!property?.images) return [];
+
+    return (property.images || []).map((img: any) => {
+      // Soportar tanto formato nuevo (PropertyMedia) como legacy (simple URL)
+      const isNewFormat = img.type !== undefined;
+
+      const finalUrl = img.url?.startsWith('http')
+        ? img.url
+        : `${SERVER_BASE_URL}${img.url}`;
+
+      const finalThumbnailUrl = img.thumbnailUrl
+        ? (img.thumbnailUrl.startsWith('http')
+          ? img.thumbnailUrl
+          : `${SERVER_BASE_URL}${img.thumbnailUrl}`)
+        : undefined;
+
+      return {
+        id: img.id,
+        type: img.type || 'IMAGE', // Legacy support: asumir IMAGE si no tiene tipo
+        url: finalUrl,
+        thumbnailUrl: finalThumbnailUrl,
+        duration: img.duration,
+        order: img.order || 0,
+      };
+    });
+  }, [property?.images]);
+
+  // Helper para formatear duración de video
+  const formatVideoDuration = (seconds?: number): string => {
+    if (!seconds) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Effect hooks DESPUÉS de todos los callbacks
+  useEffect(() => {
+    loadProperty();
+    loadFavorites();
+  }, [propertyId]);
+
+  // Scroll al índice correcto cuando se abre el modal fullscreen
+  useEffect(() => {
+    if (fullscreenImageIndex !== null && fullscreenScrollRef.current) {
+      setTimeout(() => {
+        fullscreenScrollRef.current?.scrollTo({
+          x: fullscreenImageIndex * width,
+          animated: false,
+        });
+      }, 100);
+    }
+  }, [fullscreenImageIndex, width]);
+
+  // Funciones async (loadProperty, loadFavorites)
+  const loadProperty = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await apiService.getPropertyById(propertyId);
+      setProperty(data);
+    } catch (err: any) {
+      console.error('Error loading property:', err);
+      setError(err.message || 'No se pudo cargar la propiedad');
+      Alert.alert('Error', 'No se pudo cargar los detalles de la propiedad');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadFavorites = async () => {
+    try {
+      await fetchFavorites();
+    } catch (err) {
+      console.error('[PropertyDetail] Error cargando favoritos:', err);
+    }
   };
 
   if (loading) {
     return (
       <SafeAreaView style={styles.safeContainer}>
-        <View style={{ flex: 1, position: 'relative' }}>
-          <View style={{
-            position: 'absolute',
-            top: 12,
-            left: 12,
-            zIndex: 15,
-          }}>
-            <TouchableOpacity
-              style={styles.floatingButton}
-              onPress={() => router.back()}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="chevron-back" size={24} color="#5585b5" />
-            </TouchableOpacity>
-          </View>
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <ActivityIndicator size="large" color="#5585b5" />
-          </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#5585b5" />
         </View>
       </SafeAreaView>
     );
@@ -736,156 +1006,6 @@ export default function PropertyDetailScreen() {
     );
   }
 
-  const handleScroll = (event: any) => {
-    const contentOffsetX = event.nativeEvent.contentOffset.x;
-    const currentIndex = Math.round(contentOffsetX / width);
-    setCurrentImageIndex(currentIndex);
-  };
-
-  const handleMainScroll = (event: any) => {
-    const offsetY = event.nativeEvent.contentOffset.y;
-    setScrollOffset(offsetY);
-  };
-
-  const handlePrevImage = () => {
-    const newIndex = Math.max(0, currentImageIndex - 1);
-    scrollViewRef.current?.scrollTo({
-      x: newIndex * (width > 768 ? 768 : width),
-      animated: true,
-    });
-    setCurrentImageIndex(newIndex);
-  };
-
-  const handleNextImage = () => {
-    if (propertyImages && propertyImages.length > 0) {
-      const maxIndex = propertyImages.length - 1;
-      const newIndex = Math.min(maxIndex, currentImageIndex + 1);
-      scrollViewRef.current?.scrollTo({
-        x: newIndex * (width > 768 ? 768 : width),
-        animated: true,
-      });
-      setCurrentImageIndex(newIndex);
-    }
-  };
-
-  const handleContactWhatsApp = async () => {
-    if (!property.owner?.phone) {
-      Alert.alert('Error', 'No hay número de teléfono disponible');
-      return;
-    }
-
-    // Limpiar el número: remover espacios, guiones, paréntesis
-    const phoneNumber = property.owner.phone.replace(/[^\d+]/g, '');
-
-    // Construir URL de WhatsApp
-    const whatsappUrl = Platform.OS === 'web'
-      ? `https://web.whatsapp.com/send?phone=${phoneNumber}`
-      : `whatsapp://send?phone=${phoneNumber}`;
-
-    try {
-      const canOpen = await Linking.canOpenURL(whatsappUrl);
-      if (canOpen) {
-        await Linking.openURL(whatsappUrl);
-      } else {
-        // Si no tiene WhatsApp, ofrecer alternativa
-        Alert.alert(
-          'WhatsApp no disponible',
-          '¿Deseas llamar al propietario?',
-          [
-            { text: 'Cancelar', onPress: () => { }, style: 'cancel' },
-            { text: 'Llamar', onPress: handleCall },
-          ]
-        );
-      }
-    } catch (error) {
-      Alert.alert('Error', 'No se pudo abrir WhatsApp');
-    }
-  };
-
-  const handleCall = async () => {
-    if (!property.owner?.phone) {
-      Alert.alert('Error', 'No hay número de teléfono disponible');
-      return;
-    }
-
-    const phoneNumber = property.owner.phone.replace(/[^\d+]/g, '');
-    const callUrl = `tel:${phoneNumber}`;
-
-    try {
-      const canOpen = await Linking.canOpenURL(callUrl);
-      if (canOpen) {
-        await Linking.openURL(callUrl);
-      } else {
-        Alert.alert('Error', 'No se puede realizar llamadas en este dispositivo');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'No se pudo hacer la llamada');
-    }
-  };
-
-  // 🗺️ Abre selector nativo de apps de mapas
-  const handleOpenMap = async (property: Property, e: any) => {
-    e.stopPropagation();
-    try {
-      const { latitude, longitude, title } = property;
-
-      if (!latitude || !longitude) {
-        Alert.alert('⚠️ Error', 'La propiedad no tiene coordenadas registradas');
-        return;
-      }
-
-      let mapUrl = '';
-
-      if (Platform.OS === 'ios') {
-        // iOS: URL http:// permite que otras apps compitan con Apple Maps
-        mapUrl = `http://maps.apple.com/?q=${latitude},${longitude}`;
-      } else {
-        // Android: geo: schema dispara selector nativo automáticamente
-        mapUrl = `geo:${latitude},${longitude}?q=${latitude},${longitude}(${encodeURIComponent(title)})`;
-      }
-
-      Linking.openURL(mapUrl).catch((err) => {
-        console.error('Error abriendo mapas:', err);
-
-        // Fallback: Si falla, intenta con URL web genérica
-        const fallbackUrl = `https://maps.google.com/maps?q=${latitude},${longitude}`;
-        Linking.openURL(fallbackUrl).catch(() => {
-          Alert.alert('Error', 'No se pudo abrir la aplicación de mapas');
-        });
-      });
-    } catch (error) {
-      console.error('Error abriendo mapas:', error);
-      Alert.alert('Error', 'No se pudo abrir la aplicación de mapas');
-    }
-  };
-
-  // Construir URLs completas de avatares
-  const buildAvatarUrl = (avatarPath: string | undefined) => {
-    if (!avatarPath) return null;
-    if (avatarPath.startsWith('http')) return avatarPath;
-    const cleanPath = avatarPath.startsWith('/') ? avatarPath : `/${avatarPath}`;
-    return `${SERVER_BASE_URL}${cleanPath}`;
-  };
-
-  // Construir URLs completas de imágenes
-  const propertyImages = (property.images || []).map((img: any) => {
-    const finalUrl = img.url?.startsWith('http')
-      ? img.url
-      : `${SERVER_BASE_URL}${img.url}`;
-
-    console.log('🖼️ [PropertyDetail] Image URL:', {
-      imageId: img.id,
-      originalUrl: img.url,
-      finalUrl: finalUrl,
-      urlStartsWithHttp: img.url?.startsWith('http'),
-    });
-
-    return {
-      id: img.id,
-      url: finalUrl,
-    };
-  });
-
   return (
     <SafeAreaView style={styles.safeContainer}>
       <StatusBar barStyle="light-content" backgroundColor="rgba(0, 0, 0, 1)" translucent />
@@ -922,86 +1042,86 @@ export default function PropertyDetailScreen() {
         visible={fullscreenImageIndex !== null}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setFullscreenImageIndex(null)}
+        onRequestClose={handleCloseFullscreenModal}
       >
         <View style={styles.fullscreenImageContainer}>
           {fullscreenImageIndex !== null && (
             <>
-              <Image
-                source={{ uri: propertyImages[fullscreenImageIndex]?.url }}
-                style={styles.fullscreenImage}
-              />
-
-              {/* Botones de navegación izquierda y derecha */}
-              {propertyImages.length > 1 && (
-                <>
-                  {/* Botón anterior */}
-                  <TouchableOpacity
-                    style={[
-                      styles.floatingButton,
-                      {
-                        position: 'absolute',
-                        left: 16,
-                        top: '50%',
-                        marginTop: -22,
-                        zIndex: 20,
-                      },
-                    ]}
-                    onPress={() => {
-                      const newIndex = Math.max(0, fullscreenImageIndex - 1);
-                      setFullscreenImageIndex(newIndex);
+              <ScrollView
+                ref={fullscreenScrollRef}
+                horizontal
+                pagingEnabled
+                scrollEventThrottle={16}
+                onScroll={(event) => {
+                  const contentOffsetX = event.nativeEvent.contentOffset.x;
+                  const screenWidth = event.nativeEvent.layoutMeasurement.width;
+                  const currentIndex = Math.round(contentOffsetX / screenWidth);
+                  setFullscreenImageIndex(currentIndex);
+                }}
+                showsHorizontalScrollIndicator={false}
+                scrollEnabled={propertyMedia.length > 1}
+                style={{ flex: 1, width: '100%' }}
+              >
+                {propertyMedia.map((item: PropertyMedia) => (
+                  <View
+                    key={item.id}
+                    style={{
+                      width: width,
+                      height: '100%',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      backgroundColor: '#000',
                     }}
-                    activeOpacity={0.8}
                   >
-                    <Ionicons name="chevron-back" size={24} color="#5585b5" />
-                  </TouchableOpacity>
+                    {item.type === 'IMAGE' ? (
+                      <Image
+                        source={{ uri: item.url }}
+                        style={styles.fullscreenImage}
+                      />
+                    ) : (
+                      // Video: usar VideoView component de expo-video para reproducción
+                      <View
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          backgroundColor: '#000000',
+                        }}
+                      >
+                        <VideoPlayerComponent
+                          uri={item.url}
+                          shouldPlay={fullscreenImageIndex === propertyMedia.findIndex(m => m.id === item.id)}
+                        />
+                      </View>
+                    )}
+                  </View>
+                ))}
+              </ScrollView>
 
-                  {/* Botón siguiente */}
-                  <TouchableOpacity
-                    style={[
-                      styles.floatingButton,
-                      {
-                        position: 'absolute',
-                        right: 16,
-                        top: '50%',
-                        marginTop: -22,
-                        zIndex: 20,
-                      },
-                    ]}
-                    onPress={() => {
-                      const newIndex = Math.min(propertyImages.length - 1, fullscreenImageIndex + 1);
-                      setFullscreenImageIndex(newIndex);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="chevron-forward" size={24} color="#5585b5" />
-                  </TouchableOpacity>
-
-                  {/* Indicador de página */}
+              {/* Indicador de página */}
+              {propertyMedia.length > 1 && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: 24,
+                    left: 16,
+                    zIndex: 20,
+                  }}
+                >
                   <View
                     style={{
-                      position: 'absolute',
-                      bottom: 24,
-                      left: 0,
-                      right: 0,
-                      alignItems: 'center',
-                      zIndex: 20,
+                      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 8,
                     }}
                   >
-                    <View
-                      style={{
-                        backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                        paddingHorizontal: 12,
-                        paddingVertical: 6,
-                        borderRadius: 8,
-                      }}
-                    >
-                      <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '600' }}>
-                        {fullscreenImageIndex + 1} / {propertyImages.length}
-                      </Text>
-                    </View>
+                    <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '600' }}>
+                      {fullscreenImageIndex + 1} / {propertyMedia.length}
+                    </Text>
                   </View>
-                </>
+                </View>
               )}
             </>
           )}
@@ -1009,7 +1129,7 @@ export default function PropertyDetailScreen() {
           {/* Botón cerrar */}
           <TouchableOpacity
             style={styles.fullscreenCloseButton}
-            onPress={() => setFullscreenImageIndex(null)}
+            onPress={handleCloseFullscreenModal}
           >
             <Ionicons name="close" size={24} color="#5585b5" />
           </TouchableOpacity>
@@ -1024,7 +1144,7 @@ export default function PropertyDetailScreen() {
           scrollEventThrottle={16}
         >
           {/* Image Carousel */}
-          {propertyImages.length > 0 ? (
+          {propertyMedia.length > 0 ? (
             <>
               <View style={styles.carouselWrapper}>
                 <ScrollView
@@ -1036,27 +1156,49 @@ export default function PropertyDetailScreen() {
                   showsHorizontalScrollIndicator={false}
                   style={styles.imageCarousel}
                 >
-                  {propertyImages.map((item: any, index: number) => (
+                  {propertyMedia.map((item: PropertyMedia, index: number) => (
                     <TouchableOpacity
                       key={item.id}
                       style={styles.imageContainer}
                       onPress={() => setFullscreenImageIndex(index)}
                       activeOpacity={0.9}
                     >
-                      <Image
-                        source={{ uri: item.url }}
-                        style={styles.image}
-                        onLoad={() => {
-                          console.log('✅ Image loaded successfully:', item.url);
-                        }}
-                        onError={(e) => {
-                          console.error('❌ Error loading image:', {
-                            url: item.url,
-                            errorCode: e.nativeEvent.error,
-                            timestamp: new Date().toISOString(),
-                          });
-                        }}
-                      />
+                      {item.type === 'IMAGE' ? (
+                        <Image
+                          source={{ uri: item.url }}
+                          style={styles.image}
+                          onError={(e) => {
+                            console.error('❌ Error loading image:', {
+                              url: item.url,
+                              errorCode: e.nativeEvent.error,
+                              timestamp: new Date().toISOString(),
+                            });
+                          }}
+                        />
+                      ) : (
+                        // Video: mostrar thumbnail con overlay de play
+                        <>
+                          <Image
+                            source={{ uri: item.thumbnailUrl || item.url }}
+                            style={styles.image}
+                            onError={() => {
+                              console.error('❌ Error loading video thumbnail:', item.thumbnailUrl);
+                            }}
+                          />
+                          <View style={styles.videoOverlay}>
+                            <View style={styles.playButtonContainer}>
+                              <MaterialCommunityIcons name="play" size={32} color="#5585b5" />
+                            </View>
+                          </View>
+                          {item.duration && (
+                            <View style={styles.videoDurationBadge}>
+                              <Text style={styles.videoDurationText}>
+                                {formatVideoDuration(item.duration)}
+                              </Text>
+                            </View>
+                          )}
+                        </>
+                      )}
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
@@ -1096,7 +1238,7 @@ export default function PropertyDetailScreen() {
                 {/* Pagination Badge */}
                 <View style={styles.paginationBadge}>
                   <Text style={styles.paginationBadgeText}>
-                    {currentImageIndex + 1}/{propertyImages.length}
+                    {currentImageIndex + 1}/{propertyMedia.length}
                   </Text>
                 </View>
               </View>
@@ -1198,28 +1340,6 @@ export default function PropertyDetailScreen() {
             </View>
 
 
-            {/* Description Card */}
-            <View style={styles.cardWhite}>
-              <Text style={styles.sectionTitle}>Descripción</Text>
-              {(() => {
-                const { truncated, isTruncated } = truncateDescription(property.description, DESCRIPTION_LIMIT);
-                return (
-                  <>
-                    <Text style={styles.descriptionTruncated}>{truncated}</Text>
-                    {isTruncated && (
-                      <TouchableOpacity
-                        style={styles.showMoreButton}
-                        onPress={() => setShowFullDescription(true)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.showMoreButtonText}>Mostrar más</Text>
-                      </TouchableOpacity>
-                    )}
-                  </>
-                );
-              })()}
-            </View>
-
             {/* Features Card - Dinámicas basadas en specifications */}
             {property.specifications && Object.keys(property.specifications).length > 0 ? (
               <View style={styles.cardHeaderSection}>
@@ -1240,7 +1360,6 @@ export default function PropertyDetailScreen() {
                       if (typeof value === 'boolean') {
                         return value ? (
                           <View key={key} style={styles.featureCard}>
-                            <MaterialCommunityIcons name="information" size={20} color="#5585b5" />
                             <View>
                               <Text style={[styles.featureLabel, { color: '#5585b5' }]}>{label}</Text>
                             </View>
@@ -1250,7 +1369,6 @@ export default function PropertyDetailScreen() {
 
                       return (
                         <View key={key} style={styles.featureCard}>
-                          <MaterialCommunityIcons name="information" size={20} color="#5585b5" />
                           <View>
                             <Text style={styles.featureValue}>
                               {typeof value === 'number' ? value.toFixed(0) : value}
@@ -1312,6 +1430,27 @@ export default function PropertyDetailScreen() {
               </View>
             ) : null}
 
+            {/* Description Card */}
+            <View style={styles.cardWhite}>
+              <Text style={styles.sectionTitle}>Descripción</Text>
+              {(() => {
+                const { truncated, isTruncated } = truncateDescription(property.description, DESCRIPTION_LIMIT);
+                return (
+                  <>
+                    <Text style={styles.descriptionTruncated}>{truncated}</Text>
+                    {isTruncated && (
+                      <TouchableOpacity
+                        style={styles.showMoreButton}
+                        onPress={() => setShowFullDescription(true)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.showMoreButtonText}>Mostrar más</Text>
+                      </TouchableOpacity>
+                    )}
+                  </>
+                );
+              })()}
+            </View>
             {/* Amenities Card - Ahora con etiquetas descriptivas */}
             {property.amenities && property.amenities.length > 0 && (
               <View style={styles.cardWhite}>
@@ -1339,7 +1478,7 @@ export default function PropertyDetailScreen() {
           </View>
         </ScrollView>
       </View>
-    </SafeAreaView>
+    </SafeAreaView >
   );
 }
 

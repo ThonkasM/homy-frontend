@@ -7,9 +7,11 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isGuest: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, firstName: string, lastName: string, phone?: string) => Promise<string>;
   logout: () => Promise<void>;
+  loginAsGuest: () => Promise<void>;
   error: string | null;
   clearError: () => void;
   updateUser: (updatedUser: AuthResponse['user']) => Promise<void>;
@@ -21,12 +23,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<AuthResponse['user'] | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isGuest, setIsGuest] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Restaurar sesión al montar
   useEffect(() => {
     const restoreSession = async () => {
       try {
+        const guestMode = await AsyncStorage.getItem('guestMode');
+        if (guestMode === 'true') {
+          setIsGuest(true);
+          setIsLoading(false);
+          return;
+        }
+
         const savedToken = await AsyncStorage.getItem('authToken');
         const savedUser = await AsyncStorage.getItem('authUser');
 
@@ -39,6 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (isValid && savedUser) {
             setToken(savedToken);
             setUser(JSON.parse(savedUser));
+            setIsGuest(false); // Desactivar modo invitado
           } else {
             // Token inválido, limpiar
             await AsyncStorage.removeItem('authToken');
@@ -62,8 +73,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const response = await apiService.login({ email, password });
 
-      console.log('Respuesta de login recibida:', JSON.stringify(response, null, 2));
-
       // Validar que la respuesta tenga el token y usuario
       if (!response || !response.accessToken) {
         throw new Error('Respuesta inválida del servidor: falta accessToken');
@@ -80,6 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       apiService.setToken(response.accessToken);
       setToken(response.accessToken);
       setUser(response.user);
+      setIsGuest(false); // Desactivar modo invitado
 
       console.log('Login exitoso para:', email);
     } catch (err: any) {
@@ -112,8 +122,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         phone,
       });
 
-      console.log('Respuesta de registro recibida:', JSON.stringify(response, null, 2));
-
       // Validar que la respuesta tenga el token y usuario
       if (!response || !response.accessToken) {
         throw new Error('Respuesta inválida del servidor: falta accessToken');
@@ -132,6 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       apiService.setToken(response.accessToken);
       setToken(response.accessToken);
       setUser(response.user);
+      setIsGuest(false); // Desactivar modo invitado
 
       console.log('Token y usuario guardados. Usuario:', response.user.email);
 
@@ -154,14 +163,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Limpiar almacenamiento
       await AsyncStorage.removeItem('authToken');
       await AsyncStorage.removeItem('authUser');
+      await AsyncStorage.removeItem('guestMode');
 
       // Limpiar estado
       apiService.clearToken();
       setToken(null);
       setUser(null);
+      setIsGuest(false);
       setError(null);
     } catch (err) {
       console.error('Error al cerrar sesión:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loginAsGuest = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Guardar en storage que es modo invitado
+      await AsyncStorage.setItem('guestMode', 'true');
+
+      // Limpiar cualquier sesión anterior
+      await AsyncStorage.removeItem('authToken');
+      await AsyncStorage.removeItem('authUser');
+
+      // Actualizar estado
+      apiService.clearToken();
+      setToken(null);
+      setUser(null);
+      setIsGuest(true);
+
+      console.log('✅ Iniciado como invitado');
+    } catch (err) {
+      console.error('Error en loginAsGuest:', err);
+      setError('Error al iniciar como invitado');
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -204,10 +243,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user,
     token,
     isLoading,
-    isAuthenticated: !!token && !!user,
+    isAuthenticated: (!!token && !!user) || isGuest,
+    isGuest,
     login,
     register,
     logout,
+    loginAsGuest,
     error,
     clearError,
     updateUser,

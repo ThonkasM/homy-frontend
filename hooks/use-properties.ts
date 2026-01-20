@@ -53,26 +53,16 @@ export const useProperties = () => {
                 setLoading(true);
                 setError(null);
 
-                console.log('[useProperties] fetchProperties called with:', filters);
                 const data = await apiService.getProperties({
                     page: filters?.page || 1,
                     limit: filters?.limit || 10,
                 });
 
-                console.log('[useProperties] API Response:', {
-                    success: !!data,
-                    hasProperties: !!data?.properties,
-                    propertiesCount: data?.properties?.length || 0,
-                    pagination: data?.pagination,
-                    data: JSON.stringify(data, null, 2),
-                });
-
                 if (data?.properties) {
-                    console.log('[useProperties] Setting properties:', data.properties.length);
                     setProperties(data.properties);
                     return data as PropertiesResponse;
                 } else {
-                    console.warn('[useProperties] No properties in response, data:', data);
+                    console.warn('[useProperties] No properties in response');
                     setProperties([]);
                 }
             } catch (err: any) {
