@@ -7,7 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, Platform, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Interface para items de media (imágenes y videos)
@@ -986,7 +986,7 @@ export default function CreatePostScreen() {
 
             {/* Opciones de Moneda */}
             <ScrollView showsVerticalScrollIndicator={false}>
-              {CURRENCIES.map((curr: any) => (
+              {CURRENCIES.filter((c: any) => c.value === 'BOB' || c.value === 'USD').map((curr: any) => (
                 <TouchableOpacity
                   key={curr.value}
                   style={[styles.currencyOption, formData.currency === curr.value && styles.currencyOptionActive]}
@@ -1025,391 +1025,411 @@ export default function CreatePostScreen() {
         </View>
 
         {/* Scroll Content */}
-        <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-          <View style={styles.form}>
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Información Básica</Text>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
+        >
+          <ScrollView
+            style={styles.scrollContainer}
+            contentContainerStyle={{ paddingBottom: 40 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.form}>
+              {/* Título de la Publicación */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Información Básica</Text>
 
-              <Text style={styles.fieldLabel}>Título de la Publicación *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ej: Departamento moderno en Zona Sur"
-                placeholderTextColor="#cbd5e1"
-                value={formData.title}
-                onChangeText={(text) => setFormData({ ...formData, title: text })}
-              />
+                <Text style={styles.fieldLabel}>Título de la Publicación *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ej: Departamento moderno en Zona Sur"
+                  placeholderTextColor="#cbd5e1"
+                  value={formData.title}
+                  onChangeText={(text) => setFormData({ ...formData, title: text })}
+                />
 
-              <Text style={styles.fieldLabel}>Descripción *</Text>
-              <TextInput
-                style={styles.textArea}
-                placeholder="Describe tu propiedad en detalle..."
-                placeholderTextColor="#cbd5e1"
-                multiline
-                value={formData.description}
-                onChangeText={(text) => setFormData({ ...formData, description: text })}
-              />
+                {/* Moneda y Precio */}
+                <View style={styles.row}>
+                  <View style={styles.halfInput}>
+                    <Text style={styles.fieldLabel}>Moneda *</Text>
+                    <TouchableOpacity
+                      style={styles.dropdownButton}
+                      onPress={() => setShowCurrencyModal(true)}
+                    >
+                      <Text style={styles.dropdownButtonText}>
+                        {CURRENCIES.find((c: any) => c.value === formData.currency)?.symbol} {formData.currency}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
 
-              <View style={styles.row}>
-                <View style={styles.halfInput}>
-                  <Text style={styles.fieldLabel}>Moneda *</Text>
-                  <TouchableOpacity
-                    style={styles.dropdownButton}
-                    onPress={() => setShowCurrencyModal(true)}
-                  >
-                    <Text style={styles.dropdownButtonText}>
-                      {CURRENCIES.find((c: any) => c.value === formData.currency)?.symbol} {formData.currency}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.halfInput}>
-                  <Text style={styles.fieldLabel}>Precio *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Ej: 150,000"
-                    placeholderTextColor="#cbd5e1"
-                    keyboardType="numeric"
-                    value={formData.price}
-                    onChangeText={(text) => {
-                      // Remover puntos/comas existentes y guardar solo números
-                      const numericValue = text.replace(/[^\d]/g, '');
-                      // Formatear con separador de miles
-                      const formattedValue = numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-                      setFormData({ ...formData, price: formattedValue });
-                    }}
-                  />
+                  <View style={styles.halfInput}>
+                    <Text style={styles.fieldLabel}>Precio *</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Ej: 150,000"
+                      placeholderTextColor="#cbd5e1"
+                      keyboardType="numeric"
+                      value={formData.price}
+                      onChangeText={(text) => {
+                        // Remover puntos/comas existentes y guardar solo números
+                        const numericValue = text.replace(/[^\d]/g, '');
+                        // Formatear con separador de miles
+                        const formattedValue = numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                        setFormData({ ...formData, price: formattedValue });
+                      }}
+                    />
+                  </View>
                 </View>
               </View>
-            </View>
 
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Tipo de Propiedad</Text>
+              {/* Tipo de Propiedad */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Tipo de Propiedad</Text>
 
-              <Text style={styles.fieldLabel}>Tipo de Inmueble</Text>
-              <ScrollView horizontal style={{ marginBottom: 16 }} showsHorizontalScrollIndicator={false}>
-                {propertyTypes.map((type) => (
-                  <TouchableOpacity
-                    key={type.value}
-                    style={[styles.checkboxItem, formData.propertyType === type.value && styles.checkboxItemActive]}
-                    onPress={() => setFormData({ ...formData, propertyType: type.value as any })}
-                  >
-                    <Text
-                      style={[styles.checkboxText, formData.propertyType === type.value && styles.checkboxTextActive]}
+                <Text style={styles.fieldLabel}>Tipo de Inmueble</Text>
+                <ScrollView horizontal style={{ marginBottom: 16 }} showsHorizontalScrollIndicator={false}>
+                  {propertyTypes.map((type) => (
+                    <TouchableOpacity
+                      key={type.value}
+                      style={[styles.checkboxItem, formData.propertyType === type.value && styles.checkboxItemActive]}
+                      onPress={() => setFormData({ ...formData, propertyType: type.value as any })}
                     >
-                      {type.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+                      <Text
+                        style={[styles.checkboxText, formData.propertyType === type.value && styles.checkboxTextActive]}
+                      >
+                        {type.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
 
-              <Text style={styles.fieldLabel}>Tipo de Operación</Text>
-              <ScrollView horizontal style={{ marginBottom: 16 }} showsHorizontalScrollIndicator={false}>
-                {operationTypes.map((type) => (
-                  <TouchableOpacity
-                    key={type.value}
-                    style={[styles.checkboxItem, formData.operationType === type.value && styles.checkboxItemActive]}
-                    onPress={() => setFormData({ ...formData, operationType: type.value as any })}
-                  >
-                    <Text
-                      style={[styles.checkboxText, formData.operationType === type.value && styles.checkboxTextActive]}
+                <Text style={styles.fieldLabel}>Tipo de Operación</Text>
+                <ScrollView horizontal style={{ marginBottom: 16 }} showsHorizontalScrollIndicator={false}>
+                  {operationTypes.map((type) => (
+                    <TouchableOpacity
+                      key={type.value}
+                      style={[styles.checkboxItem, formData.operationType === type.value && styles.checkboxItemActive]}
+                      onPress={() => setFormData({ ...formData, operationType: type.value as any })}
                     >
-                      {type.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
+                      <Text
+                        style={[styles.checkboxText, formData.operationType === type.value && styles.checkboxTextActive]}
+                      >
+                        {type.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
 
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Características de {propertyConfig?.label || 'Propiedad'}</Text>
+              {/* Características */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Características de {propertyConfig?.label || 'Propiedad'}</Text>
 
-              {propertyConfig ? (
-                propertyConfig.fields.map((field) => (
-                  <View key={field.key} style={{ marginBottom: 16 }}>
-                    <Text style={styles.fieldLabel}>
-                      {field.label}
-                      {field.required ? ' *' : ''}
-                    </Text>
+                {propertyConfig ? (
+                  propertyConfig.fields.map((field) => (
+                    <View key={field.key} style={{ marginBottom: 16 }}>
+                      <Text style={styles.fieldLabel}>
+                        {field.label}
+                        {field.required ? ' *' : ''}
+                      </Text>
 
-                    {field.type === 'number' && (
-                      <TextInput
-                        style={styles.input}
-                        placeholder={field.placeholder || `Ej: ${field.min || 0}`}
-                        keyboardType="numeric"
-                        value={formData.specifications[field.key]?.toString() || ''}
-                        onChangeText={(text) => updateSpecification(field.key, text ? parseInt(text) : null)}
-                      />
-                    )}
-
-                    {field.type === 'decimal' && (
-                      <View style={styles.row}>
+                      {field.type === 'number' && (
                         <TextInput
-                          style={[styles.halfInput, styles.input]}
-                          placeholder={field.placeholder || 'Ej: 120.5'}
-                          keyboardType="decimal-pad"
+                          style={styles.input}
+                          placeholder={field.placeholder || `Ej: ${field.min || 0}`}
+                          keyboardType="numeric"
                           value={formData.specifications[field.key]?.toString() || ''}
-                          onChangeText={(text) => updateSpecification(field.key, text ? parseFloat(text) : null)}
+                          onChangeText={(text) => updateSpecification(field.key, text ? parseInt(text) : null)}
                         />
-                        {field.unit && (
-                          <View style={[styles.halfInput, { justifyContent: 'center', paddingLeft: 8 }]}>
-                            <Text style={styles.fieldLabel}>{field.unit}</Text>
-                          </View>
-                        )}
-                      </View>
-                    )}
+                      )}
 
-                    {field.type === 'boolean' && (
+                      {field.type === 'decimal' && (
+                        <View style={styles.row}>
+                          <TextInput
+                            style={[styles.halfInput, styles.input]}
+                            placeholder={field.placeholder || 'Ej: 120.5'}
+                            keyboardType="decimal-pad"
+                            value={formData.specifications[field.key]?.toString() || ''}
+                            onChangeText={(text) => updateSpecification(field.key, text ? parseFloat(text) : null)}
+                          />
+                          {field.unit && (
+                            <View style={[styles.halfInput, { justifyContent: 'center', paddingLeft: 8 }]}>
+                              <Text style={styles.fieldLabel}>{field.unit}</Text>
+                            </View>
+                          )}
+                        </View>
+                      )}
+
+                      {field.type === 'boolean' && (
+                        <TouchableOpacity
+                          style={[
+                            styles.checkboxItem,
+                            formData.specifications[field.key] && styles.checkboxItemActive,
+                          ]}
+                          onPress={() => updateSpecification(field.key, !formData.specifications[field.key])}
+                        >
+                          <Text
+                            style={[
+                              styles.checkboxText,
+                              formData.specifications[field.key] && styles.checkboxTextActive,
+                            ]}
+                          >
+                            {formData.specifications[field.key] ? '✓' : '○'} {field.label}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+
+                      {field.type === 'select' && (
+                        <View style={styles.checkboxContainer}>
+                          {field.options?.map((option) => (
+                            <TouchableOpacity
+                              key={option.value}
+                              style={[
+                                styles.checkboxItem,
+                                formData.specifications[field.key] === option.value &&
+                                styles.checkboxItemActive,
+                              ]}
+                              onPress={() => updateSpecification(field.key, option.value)}
+                            >
+                              <Text
+                                style={[
+                                  styles.checkboxText,
+                                  formData.specifications[field.key] === option.value &&
+                                  styles.checkboxTextActive,
+                                ]}
+                              >
+                                {option.label}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  ))
+                ) : (
+                  <Text style={{ color: '#64748b' }}>Cargando configuración...</Text>
+                )}
+              </View>
+
+              {/* Descripción */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Descripción</Text>
+
+                <Text style={styles.fieldLabel}>Descripción *</Text>
+                <TextInput
+                  style={styles.textArea}
+                  placeholder="Describe tu propiedad en detalle..."
+                  placeholderTextColor="#cbd5e1"
+                  multiline
+                  value={formData.description}
+                  onChangeText={(text) => setFormData({ ...formData, description: text })}
+                />
+              </View>
+
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>📍 Ubicación y Contacto</Text>
+
+                <Text style={styles.fieldLabel}>Dirección *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ej: Calle Principal 123, Apt 5"
+                  value={formData.address}
+                  onChangeText={(text) => setFormData({ ...formData, address: text })}
+                />
+
+                <Text style={styles.fieldLabel}>Ciudad *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ej: La Paz"
+                  value={formData.city}
+                  onChangeText={(text) => setFormData({ ...formData, city: text })}
+                />
+
+                {/* Botón para mostrar/ocultar mapa - SOLO EN MOBILE */}
+                <TouchableOpacity
+                  style={styles.mapButton}
+                  onPress={() => setShowMap(!showMap)}
+                >
+                  <Text style={styles.mapButtonText}>
+                    {showMap ? '🗺️ Ocultar Mapa' : '🗺️ Seleccionar Ubicación en Mapa'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* MapView para seleccionar ubicación */}
+                {showMap && MapViewComponent && (
+                  <View style={styles.mapContainer}>
+                    <MapViewComponent
+                      selectedLocation={
+                        formData.latitude && formData.longitude
+                          ? {
+                            latitude: parseFloat(formData.latitude),
+                            longitude: parseFloat(formData.longitude),
+                          }
+                          : {
+                            latitude: -17.8,
+                            longitude: -63.18,
+                          }
+                      }
+                      onLocationSelect={(lat: number, lon: number) => {
+                        setFormData({
+                          ...formData,
+                          latitude: lat.toFixed(6),
+                          longitude: lon.toFixed(6),
+                        });
+                      }}
+                      style={{ height: 350 }}
+                    />
+                  </View>
+                )}
+
+                <View style={styles.row}>
+                  <View style={[styles.halfInput, { marginBottom: 16 }]}>
+                    <Text style={styles.fieldLabel}>Latitud</Text>
+                    <TextInput
+                      style={[styles.input, showMap && styles.inputReadOnly]}
+                      placeholder="Ej: -16.5"
+                      keyboardType="decimal-pad"
+                      value={formData.latitude}
+                      onChangeText={(text) => !showMap && setFormData({ ...formData, latitude: text })}
+                      editable={!showMap}
+                    />
+                  </View>
+
+                  <View style={[styles.halfInput, { marginBottom: 16 }]}>
+                    <Text style={styles.fieldLabel}>Longitud</Text>
+                    <TextInput
+                      style={[styles.input, showMap && styles.inputReadOnly]}
+                      placeholder="Ej: -68.1"
+                      keyboardType="decimal-pad"
+                      value={formData.longitude}
+                      onChangeText={(text) => !showMap && setFormData({ ...formData, longitude: text })}
+                      editable={!showMap}
+                    />
+                  </View>
+                </View>
+
+                <Text style={styles.fieldLabel}>Teléfono de Contacto</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ej: +591 71234567"
+                  keyboardType="phone-pad"
+                  value={formData.contactPhone}
+                  onChangeText={(text) => setFormData({ ...formData, contactPhone: text })}
+                />
+              </View>
+
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Amenidades para {propertyConfig?.label || 'Propiedad'}</Text>
+
+                {propertyConfig && propertyConfig.amenities.length > 0 ? (
+                  <View style={styles.checkboxContainer}>
+                    {propertyConfig.amenities.map((amenity) => (
                       <TouchableOpacity
+                        key={amenity.id}
                         style={[
                           styles.checkboxItem,
-                          formData.specifications[field.key] && styles.checkboxItemActive,
+                          formData.amenities.includes(amenity.id) && styles.checkboxItemActive,
                         ]}
-                        onPress={() => updateSpecification(field.key, !formData.specifications[field.key])}
+                        onPress={() => toggleAmenity(amenity.id)}
                       >
                         <Text
                           style={[
                             styles.checkboxText,
-                            formData.specifications[field.key] && styles.checkboxTextActive,
+                            formData.amenities.includes(amenity.id) && styles.checkboxTextActive,
                           ]}
                         >
-                          {formData.specifications[field.key] ? '✓' : '○'} {field.label}
+                          {formData.amenities.includes(amenity.id) ? '✓' : '○'} {amenity.label}
                         </Text>
                       </TouchableOpacity>
-                    )}
-
-                    {field.type === 'select' && (
-                      <View style={styles.checkboxContainer}>
-                        {field.options?.map((option) => (
-                          <TouchableOpacity
-                            key={option.value}
-                            style={[
-                              styles.checkboxItem,
-                              formData.specifications[field.key] === option.value &&
-                              styles.checkboxItemActive,
-                            ]}
-                            onPress={() => updateSpecification(field.key, option.value)}
-                          >
-                            <Text
-                              style={[
-                                styles.checkboxText,
-                                formData.specifications[field.key] === option.value &&
-                                styles.checkboxTextActive,
-                              ]}
-                            >
-                              {option.label}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    )}
+                    ))}
                   </View>
-                ))
-              ) : (
-                <Text style={{ color: '#64748b' }}>Cargando configuración...</Text>
-              )}
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>📍 Ubicación y Contacto</Text>
-
-              <Text style={styles.fieldLabel}>Dirección *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ej: Calle Principal 123, Apt 5"
-                value={formData.address}
-                onChangeText={(text) => setFormData({ ...formData, address: text })}
-              />
-
-              <Text style={styles.fieldLabel}>Ciudad *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ej: La Paz"
-                value={formData.city}
-                onChangeText={(text) => setFormData({ ...formData, city: text })}
-              />
-
-              {/* Botón para mostrar/ocultar mapa - SOLO EN MOBILE */}
-              <TouchableOpacity
-                style={styles.mapButton}
-                onPress={() => setShowMap(!showMap)}
-              >
-                <Text style={styles.mapButtonText}>
-                  {showMap ? '🗺️ Ocultar Mapa' : '🗺️ Seleccionar Ubicación en Mapa'}
-                </Text>
-              </TouchableOpacity>
-
-              {/* MapView para seleccionar ubicación */}
-              {showMap && MapViewComponent && (
-                <View style={styles.mapContainer}>
-                  <MapViewComponent
-                    selectedLocation={
-                      formData.latitude && formData.longitude
-                        ? {
-                          latitude: parseFloat(formData.latitude),
-                          longitude: parseFloat(formData.longitude),
-                        }
-                        : {
-                          latitude: -17.8,
-                          longitude: -63.18,
-                        }
-                    }
-                    onLocationSelect={(lat: number, lon: number) => {
-                      setFormData({
-                        ...formData,
-                        latitude: lat.toFixed(6),
-                        longitude: lon.toFixed(6),
-                      });
-                    }}
-                    style={{ height: 350 }}
-                  />
-                </View>
-              )}
-
-              <View style={styles.row}>
-                <View style={[styles.halfInput, { marginBottom: 16 }]}>
-                  <Text style={styles.fieldLabel}>Latitud</Text>
-                  <TextInput
-                    style={[styles.input, showMap && styles.inputReadOnly]}
-                    placeholder="Ej: -16.5"
-                    keyboardType="decimal-pad"
-                    value={formData.latitude}
-                    onChangeText={(text) => !showMap && setFormData({ ...formData, latitude: text })}
-                    editable={!showMap}
-                  />
-                </View>
-
-                <View style={[styles.halfInput, { marginBottom: 16 }]}>
-                  <Text style={styles.fieldLabel}>Longitud</Text>
-                  <TextInput
-                    style={[styles.input, showMap && styles.inputReadOnly]}
-                    placeholder="Ej: -68.1"
-                    keyboardType="decimal-pad"
-                    value={formData.longitude}
-                    onChangeText={(text) => !showMap && setFormData({ ...formData, longitude: text })}
-                    editable={!showMap}
-                  />
-                </View>
+                ) : (
+                  <Text style={{ color: '#64748b' }}>Este tipo de propiedad no tiene amenidades disponibles</Text>
+                )}
               </View>
 
-              <Text style={styles.fieldLabel}>Teléfono de Contacto</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ej: +591 71234567"
-                keyboardType="phone-pad"
-                value={formData.contactPhone}
-                onChangeText={(text) => setFormData({ ...formData, contactPhone: text })}
-              />
-            </View>
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Fotos</Text>
 
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Amenidades para {propertyConfig?.label || 'Propiedad'}</Text>
-
-              {propertyConfig && propertyConfig.amenities.length > 0 ? (
-                <View style={styles.checkboxContainer}>
-                  {propertyConfig.amenities.map((amenity) => (
-                    <TouchableOpacity
-                      key={amenity.id}
-                      style={[
-                        styles.checkboxItem,
-                        formData.amenities.includes(amenity.id) && styles.checkboxItemActive,
-                      ]}
-                      onPress={() => toggleAmenity(amenity.id)}
-                    >
-                      <Text
-                        style={[
-                          styles.checkboxText,
-                          formData.amenities.includes(amenity.id) && styles.checkboxTextActive,
-                        ]}
-                      >
-                        {formData.amenities.includes(amenity.id) ? '✓' : '○'} {amenity.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              ) : (
-                <Text style={{ color: '#64748b' }}>Este tipo de propiedad no tiene amenidades disponibles</Text>
-              )}
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Fotos</Text>
-
-              {selectedMedia.length > 0 && (
-                <View style={styles.imagesGrid}>
-                  {selectedMedia.map((media, index) => (
-                    <View key={index} style={styles.imageContainer}>
-                      <Image source={{ uri: media.uri }} style={styles.selectedImage} />
-                      {media.type === 'video' && (
-                        <View style={styles.mediaOverlay}>
-                          <View style={styles.playButtonSmall}>
-                            <Text style={styles.playButtonText}>▶</Text>
-                          </View>
-                        </View>
-                      )}
-                      <TouchableOpacity
-                        style={styles.removeImageButton}
-                        onPress={() => removeMedia(index)}
-                      >
-                        <Text style={styles.removeImageText}>✕</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              <Text style={styles.imageCounter}>
-                {selectedMedia.length}/10 archivo{selectedMedia.length !== 1 ? 's' : ''} seleccionado{selectedMedia.length !== 1 ? 's' : ''}
                 {selectedMedia.length > 0 && (
-                  <Text style={{ color: '#7c3aed' }}>
-                    {' '}({selectedMedia.filter(m => m.type === 'image').length} imagen{selectedMedia.filter(m => m.type === 'image').length !== 1 ? 'es' : ''}, {selectedMedia.filter(m => m.type === 'video').length} video{selectedMedia.filter(m => m.type === 'video').length !== 1 ? 's' : ''})
-                  </Text>
+                  <View style={styles.imagesGrid}>
+                    {selectedMedia.map((media, index) => (
+                      <View key={index} style={styles.imageContainer}>
+                        <Image source={{ uri: media.uri }} style={styles.selectedImage} />
+                        {media.type === 'video' && (
+                          <View style={styles.mediaOverlay}>
+                            <View style={styles.playButtonSmall}>
+                              <Text style={styles.playButtonText}>▶</Text>
+                            </View>
+                          </View>
+                        )}
+                        <TouchableOpacity
+                          style={styles.removeImageButton}
+                          onPress={() => removeMedia(index)}
+                        >
+                          <Text style={styles.removeImageText}>✕</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
                 )}
-              </Text>
 
-              <TouchableOpacity
-                style={styles.uploadButton}
-                onPress={showImageOptions}
-                disabled={selectedMedia.length >= 10}
-              >
-                <Text style={styles.uploadText}>
-                  {selectedMedia.length >= 10 ? '✓ Máximo alcanzado' : '+ Agregar Fotos o Videos'}
+                <Text style={styles.imageCounter}>
+                  {selectedMedia.length}/10 archivo{selectedMedia.length !== 1 ? 's' : ''} seleccionado{selectedMedia.length !== 1 ? 's' : ''}
+                  {selectedMedia.length > 0 && (
+                    <Text style={{ color: '#7c3aed' }}>
+                      {' '}({selectedMedia.filter(m => m.type === 'image').length} imagen{selectedMedia.filter(m => m.type === 'image').length !== 1 ? 'es' : ''}, {selectedMedia.filter(m => m.type === 'video').length} video{selectedMedia.filter(m => m.type === 'video').length !== 1 ? 's' : ''})
+                    </Text>
+                  )}
                 </Text>
-              </TouchableOpacity>
-            </View>
 
-            <View style={styles.buttonsContainer}>
-              <TouchableOpacity
-                style={[styles.draftButton, isSubmitting && styles.draftButtonDisabled]}
-                onPress={handleSaveDraft}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <>
-                    <ActivityIndicator color="#5585b5" style={{ marginRight: 8 }} />
-                    <Text style={[styles.draftButtonText]}>Guardando...</Text>
-                  </>
-                ) : (
-                  <Text style={styles.draftButtonText}>GUARDAR BORRADOR</Text>
-                )}
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.uploadButton}
+                  onPress={showImageOptions}
+                  disabled={selectedMedia.length >= 10}
+                >
+                  <Text style={styles.uploadText}>
+                    {selectedMedia.length >= 10 ? '✓ Máximo alcanzado' : '+ Agregar Fotos o Videos'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
-              <TouchableOpacity
-                style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
-                onPress={handlePublishProperty}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <>
-                    <ActivityIndicator color="#ffffff" style={{ marginRight: 8 }} />
-                    <Text style={styles.submitButtonText}>Publicando...</Text>
-                  </>
-                ) : (
-                  <Text style={styles.submitButtonText}>PUBLICAR PROPIEDAD</Text>
-                )}
-              </TouchableOpacity>
+              <View style={styles.buttonsContainer}>
+                <TouchableOpacity
+                  style={[styles.draftButton, isSubmitting && styles.draftButtonDisabled]}
+                  onPress={handleSaveDraft}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <ActivityIndicator color="#5585b5" style={{ marginRight: 8 }} />
+                      <Text style={[styles.draftButtonText]}>Guardando...</Text>
+                    </>
+                  ) : (
+                    <Text style={styles.draftButtonText}>GUARDAR BORRADOR</Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+                  onPress={handlePublishProperty}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <ActivityIndicator color="#ffffff" style={{ marginRight: 8 }} />
+                      <Text style={styles.submitButtonText}>Publicando...</Text>
+                    </>
+                  ) : (
+                    <Text style={styles.submitButtonText}>PUBLICAR PROPIEDAD</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </ScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </View>
     </SafeAreaView>
   );

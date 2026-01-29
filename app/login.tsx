@@ -1,7 +1,7 @@
 import { useAuth } from "@/context/auth-context";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const styles = StyleSheet.create({
@@ -13,7 +13,6 @@ const styles = StyleSheet.create({
         flexGrow: 1,
     },
     container: {
-        flex: 1,
         paddingHorizontal: 24,
         paddingTop: 20,
     },
@@ -234,104 +233,111 @@ export default function LoginScreen() {
 
     return (
         <SafeAreaView style={styles.safeContainer}>
-            <ScrollView
-                contentContainerStyle={styles.scrollContainer}
-                showsVerticalScrollIndicator={false}
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
             >
-                <View style={styles.container}>
-                    {/* Top Section - Logo & Brand */}
-                    <View style={styles.topSection}>
-                        <View style={styles.logoContainer}>
-                            <Image
-                                source={require('@/assets/logos/BigLogo.jpeg')}
-                                style={styles.logoImage}
-                                resizeMode="contain"
-                            />
+                <ScrollView
+                    contentContainerStyle={[styles.scrollContainer, { paddingBottom: 40 }]}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    <View style={styles.container}>
+                        {/* Top Section - Logo & Brand */}
+                        <View style={styles.topSection}>
+                            <View style={styles.logoContainer}>
+                                <Image
+                                    source={require('@/assets/logos/BigLogo.jpeg')}
+                                    style={styles.logoImage}
+                                    resizeMode="contain"
+                                />
+                            </View>
                         </View>
-                    </View>
 
-                    {/* Header Section */}
-                    <View style={styles.headerSection}>
-                        <Text style={styles.headerTitle}>
-                            Accede a tu Cuenta
-                        </Text>
-                        <Text style={styles.headerSubtitle}>
-                            Gestiona tus propiedades y solicitudes
-                        </Text>
-                    </View>
+                        {/* Header Section */}
+                        <View style={styles.headerSection}>
+                            <Text style={styles.headerTitle}>
+                                Accede a tu Cuenta
+                            </Text>
+                            <Text style={styles.headerSubtitle}>
+                                Gestiona tus propiedades y solicitudes
+                            </Text>
+                        </View>
 
-                    {/* Form Container */}
-                    <View style={styles.formContainer}>
-                        {/* Email Input */}
-                        <Text style={styles.fieldLabel}>Correo Electrónico</Text>
-                        <TextInput
-                            style={styles.emailInput}
-                            placeholder="tu@email.com"
-                            placeholderTextColor="#cbd5e1"
-                            value={email}
-                            onChangeText={setEmail}
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                            editable={!isLoading}
-                        />
-
-                        {/* Password Input */}
-                        <Text style={styles.fieldLabel}>Contraseña</Text>
-                        <View style={styles.passwordContainer}>
+                        {/* Form Container */}
+                        <View style={styles.formContainer}>
+                            {/* Email Input */}
+                            <Text style={styles.fieldLabel}>Correo Electrónico</Text>
                             <TextInput
-                                style={styles.passwordInput}
-                                placeholder="Contraseña"
+                                style={styles.emailInput}
+                                placeholder="tu@email.com"
                                 placeholderTextColor="#cbd5e1"
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry={!showPassword}
+                                value={email}
+                                onChangeText={setEmail}
+                                keyboardType="email-address"
+                                autoCapitalize="none"
                                 editable={!isLoading}
                             />
+
+                            {/* Password Input */}
+                            <Text style={styles.fieldLabel}>Contraseña</Text>
+                            <View style={styles.passwordContainer}>
+                                <TextInput
+                                    style={styles.passwordInput}
+                                    placeholder="Contraseña"
+                                    placeholderTextColor="#cbd5e1"
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    secureTextEntry={!showPassword}
+                                    editable={!isLoading}
+                                />
+                                <TouchableOpacity
+                                    onPress={() => setShowPassword(!showPassword)}
+                                    disabled={isLoading}
+                                    style={styles.showPasswordBtn}
+                                >
+                                    <Text style={styles.showPasswordText}>
+                                        {showPassword ? "Ocultar" : "Mostrar"}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Forgot Password */}
+                            <View style={styles.forgotContainer}>
+                                <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
+                            </View>
+
+                            {/* Login Button */}
                             <TouchableOpacity
-                                onPress={() => setShowPassword(!showPassword)}
+                                onPress={handleLogin}
                                 disabled={isLoading}
-                                style={styles.showPasswordBtn}
+                                style={[styles.loginButton, isLoading && styles.loginButtonLoading]}
                             >
-                                <Text style={styles.showPasswordText}>
-                                    {showPassword ? "Ocultar" : "Mostrar"}
+                                <Text style={styles.loginButtonText}>
+                                    {isLoading ? "Iniciando sesión..." : "INICIAR SESIÓN"}
                                 </Text>
                             </TouchableOpacity>
+
+                            {/* Divider */}
+                            <View style={styles.dividerLine} />
+
+                            {/* Sign Up */}
+                            <View style={styles.signupContainer}>
+                                <Text style={styles.signupText}>¿No tienes cuenta? </Text>
+                                <TouchableOpacity disabled={isLoading} onPress={() => router.push('/register')}>
+                                    <Text style={styles.signupLink}>Crea una aquí</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
-                        {/* Forgot Password */}
-                        <View style={styles.forgotContainer}>
-                            <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
-                        </View>
-
-                        {/* Login Button */}
-                        <TouchableOpacity
-                            onPress={handleLogin}
-                            disabled={isLoading}
-                            style={[styles.loginButton, isLoading && styles.loginButtonLoading]}
-                        >
-                            <Text style={styles.loginButtonText}>
-                                {isLoading ? "Iniciando sesión..." : "INICIAR SESIÓN"}
-                            </Text>
-                        </TouchableOpacity>
-
-                        {/* Divider */}
-                        <View style={styles.dividerLine} />
-
-                        {/* Sign Up */}
-                        <View style={styles.signupContainer}>
-                            <Text style={styles.signupText}>¿No tienes cuenta? </Text>
-                            <TouchableOpacity disabled={isLoading} onPress={() => router.push('/register')}>
-                                <Text style={styles.signupLink}>Crea una aquí</Text>
-                            </TouchableOpacity>
+                        {/* Footer */}
+                        <View style={styles.footer}>
+                            <Text style={styles.footerText}>© 2026 HO-MY. Todos los derechos reservados.</Text>
                         </View>
                     </View>
-
-                    {/* Footer */}
-                    <View style={styles.footer}>
-                        <Text style={styles.footerText}>© 2025 Homi. Todos los derechos reservados.</Text>
-                    </View>
-                </View>
-            </ScrollView>
+                </ScrollView>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 }

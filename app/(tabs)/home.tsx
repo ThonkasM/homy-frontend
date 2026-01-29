@@ -1,37 +1,36 @@
+import FiltersModal from '@/components/filters-modal';
 import { formatPriceWithCurrency } from '@/config/currencies.config';
 import { useAuth } from '@/context/auth-context';
 import { useFavoritesContext } from '@/context/favorites-context';
-import { Property, useProperties } from '@/hooks/use-properties';
+import { Property, PropertyFilters, useProperties } from '@/hooks/use-properties';
 import { SERVER_BASE_URL } from '@/services/api';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ExpoLinking from 'expo-linking';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Animated,
   Dimensions,
+  FlatList,
   Image,
   Linking,
-  Modal,
   Platform,
   Pressable,
   RefreshControl,
-  ScrollView,
   Share,
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
   useWindowDimensions
 } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// Componente separado para la tarjeta de propiedad con animación
-const PropertyCard = ({
+// Componente separado para la tarjeta de propiedad con animación (Memoizado para evitar re-renders)
+const PropertyCard = React.memo(({
   property,
   styles,
   isLiked,
@@ -56,31 +55,28 @@ const PropertyCard = ({
   userName?: string;
   isMobile: boolean;
 }) => {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  // Usar Reanimated (mejor rendimiento en Samsung)
+  const scale = useSharedValue(1);
   const imageUrl = property.images?.[0]?.url;
   const iconSize = isMobile ? 16 : 20;
 
   const handleHeartPress = (propertyId: string, e: any) => {
     e.stopPropagation();
 
-    // Animación de escala y rebote
-    Animated.sequence([
-      Animated.spring(scaleAnim, {
-        toValue: 1.2,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 3,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 3,
-      }),
-    ]).start();
+    // Animación de escala y rebote con Reanimated (optimizado para Samsung)
+    scale.value = withSpring(1.2, { damping: 10, stiffness: 100 }, () => {
+      scale.value = withSpring(1, { damping: 10, stiffness: 100 });
+    });
 
     onLike(propertyId, e);
   };
+
+  // Estilo animado con Reanimated
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: scale.value }],
+    };
+  });
 
   const buildImageUrl = (imagePath: string | undefined) => {
     if (!imagePath) return null;
@@ -150,9 +146,7 @@ const PropertyCard = ({
           <Animated.View
             style={[
               styles.heartButton,
-              {
-                transform: [{ scale: scaleAnim }],
-              },
+              animatedStyle,
             ]}
           >
             <TouchableOpacity
@@ -213,7 +207,14 @@ const PropertyCard = ({
       </View>
     </View>
   );
-};
+}, (prevProps, nextProps) => {
+  // Comparación personalizada para evitar re-renders innecesarios
+  return (
+    prevProps.property.id === nextProps.property.id &&
+    prevProps.isLiked === nextProps.isLiked &&
+    prevProps.isMobile === nextProps.isMobile
+  );
+});
 
 const createStyles = (width: number) => {
   const isWeb = width > 768;
@@ -245,6 +246,11 @@ const createStyles = (width: number) => {
       maxWidth: maxWidth as any,
       alignSelf: 'center',
     },
+    headerContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
     headerTitle: {
       fontSize: 28,
       fontWeight: '800',
@@ -255,28 +261,16 @@ const createStyles = (width: number) => {
     headerLogo: {
       height: 40,
       width: 120,
-      marginBottom: 12,
     },
-    searchContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
+    searchButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       backgroundColor: '#f1f5f9',
-      borderRadius: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
       borderWidth: 1,
       borderColor: '#e2e8f0',
-      paddingHorizontal: 16,
-      height: 44,
-    },
-    searchIcon: {
-      fontSize: 16,
-      marginRight: 8,
-      color: '#64748b',
-    },
-    searchInput: {
-      flex: 1,
-      fontSize: 15,
-      color: '#0f172a',
-      paddingVertical: 0,
     },
     // Feed estilo Instagram
     feedContainer: {
@@ -542,127 +536,39 @@ const createStyles = (width: number) => {
       elevation: 3,
     },
     filterButton: {
+      position: 'relative',
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: 10,
-      paddingHorizontal: 16,
-      borderRadius: 10,
-      backgroundColor: '#f3f4f6',
-      borderWidth: 1,
-      borderColor: '#e5e7eb',
+      justifyContent: 'flex-start',
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      borderRadius: 12,
+      backgroundColor: '#ffffff',
+      borderWidth: 1.5,
+      borderColor: '#5585b5',
       gap: 8,
+      shadowColor: '#5585b5',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 2,
     },
     filterButtonText: {
-      fontSize: 14,
-      fontWeight: '600',
+      fontSize: 15,
+      fontWeight: '700',
       color: '#5585b5',
+      letterSpacing: 0.3,
     },
     filterBadge: {
-      marginLeft: 'auto',
-      backgroundColor: '#ef4444',
-      borderRadius: 12,
-      minWidth: 24,
-      height: 24,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    filterBadgeText: {
-      color: '#ffffff',
-      fontSize: 12,
-      fontWeight: '700',
-    },
-    // Modal styles
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      justifyContent: 'flex-end',
-    },
-    modalContent: {
-      backgroundColor: '#ffffff',
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
-      maxHeight: '90%',
-      paddingTop: 0,
-    },
-    modalHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingHorizontal: 20,
-      paddingVertical: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: '#f3f4f6',
-    },
-    modalTitle: {
-      fontSize: 18,
-      fontWeight: '700',
-      color: '#1f2937',
-    },
-    filtersList: {
-      paddingHorizontal: 20,
-      paddingVertical: 16,
-    },
-    filterItemContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 14,
-      gap: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: '#f3f4f6',
-    },
-    checkbox: {
-      width: 24,
-      height: 24,
-      borderRadius: 6,
-      borderWidth: 2,
-      borderColor: '#e5e7eb',
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: '#ffffff',
-    },
-    filterItemLabel: {
-      flex: 1,
-      fontSize: 15,
-      fontWeight: '500',
-      color: '#1f2937',
-    },
-    colorIndicator: {
+      position: 'absolute',
+      top: -4,
+      right: -4,
       width: 12,
       height: 12,
+      backgroundColor: '#ef4444',
       borderRadius: 6,
-    },
-    modalFooter: {
-      flexDirection: 'row',
-      gap: 12,
-      paddingHorizontal: 20,
-      paddingVertical: 16,
-      borderTopWidth: 1,
-      borderTopColor: '#f3f4f6',
-    },
-    filterActionButton: {
-      flex: 1,
-      paddingVertical: 12,
-      paddingHorizontal: 16,
-      borderRadius: 10,
-      backgroundColor: '#f3f4f6',
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderWidth: 1,
-      borderColor: '#e5e7eb',
-    },
-    filterActionButtonPrimary: {
-      backgroundColor: '#5585b5',
-      borderColor: '#5585b5',
-    },
-    filterActionButtonText: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: '#64748b',
-    },
-    filterActionButtonPrimaryText: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: '#ffffff',
+      borderWidth: 2,
+      borderColor: '#ffffff',
     },
   });
 };
@@ -672,75 +578,80 @@ export default function HomeScreen() {
   const { user, isGuest } = useAuth();
   const { properties, loading, error, fetchProperties } = useProperties();
   const { favorites, fetchFavorites, addFavorite, removeFavorite } = useFavoritesContext();
-  const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
-  const [selectedFilters, setSelectedFilters] = useState<{ [key: string]: boolean }>({
-    HOUSE: true,
-    APARTMENT: true,
-    OFFICE: true,
-    LAND: true,
-    COMMERCIAL: true,
-    WAREHOUSE: true,
-    ROOM: true,
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [allProperties, setAllProperties] = useState<Property[]>([]);
+  const flatListRef = useRef<FlatList>(null);
+  const isLoadingMoreRef = useRef(false); // Evitar llamadas duplicadas
+
+  // Estado completo de filtros avanzados
+  const [advancedFilters, setAdvancedFilters] = useState<PropertyFilters>({
+    page: 1,
+    limit: 3, // Carga inicial más rápida
   });
+
+  // Filtros UI (para el modal) - Inicialmente sin filtros
+  const [selectedPropertyTypes, setSelectedPropertyTypes] = useState<{ [key: string]: boolean }>({
+    HOUSE: false,
+    APARTMENT: false,
+    OFFICE: false,
+    LAND: false,
+    COMMERCIAL: false,
+    WAREHOUSE: false,
+    ROOM: false,
+  });
+
   const { width } = useWindowDimensions();
-  const styles = createStyles(width);
+  const styles = useMemo(() => createStyles(width), [width]);
   const isMobile = width <= 768;
 
-  const propertyTypes = [
-    { type: 'HOUSE', label: 'Casa' },
-    { type: 'APARTMENT', label: 'Departamento' },
-    { type: 'OFFICE', label: 'Oficina' },
-    { type: 'LAND', label: 'Terreno' },
-    { type: 'COMMERCIAL', label: 'Comercial' },
-    { type: 'WAREHOUSE', label: 'Almacén' },
-    { type: 'ROOM', label: 'Habitación' },
-  ];
-
-  // Create a Set of favorite property IDs for quick lookup
-  const likedProperties = new Set(
-    favorites.map((fav) => fav.propertyId)
+  // Create a Set of favorite property IDs for quick lookup (memoizado)
+  const likedProperties = useMemo(
+    () => new Set(favorites.map((fav) => fav.propertyId)),
+    [favorites]
   );
 
-  // Funciones de filtrado
-  const toggleFilter = (propertyType: string) => {
-    setSelectedFilters(prev => ({
+  // Función para toggle de tipo de propiedad
+  const togglePropertyTypeFilter = (propertyType: string) => {
+    setSelectedPropertyTypes(prev => ({
       ...prev,
       [propertyType]: !prev[propertyType]
     }));
   };
 
-  const selectAllFilters = () => {
-    const allSelected: { [key: string]: boolean } = {};
-    propertyTypes.forEach(pt => {
-      allSelected[pt.type] = true;
-    });
-    setSelectedFilters(allSelected);
+  // Aplicar filtros desde el modal
+  const handleApplyFilters = async (newFilters: PropertyFilters) => {
+    setAdvancedFilters(newFilters);
+    setFilterModalVisible(false);
+    await loadPropertiesWithFilters(newFilters);
   };
 
-  const clearAllFilters = () => {
-    const allCleared: { [key: string]: boolean } = {};
-    propertyTypes.forEach(pt => {
-      allCleared[pt.type] = false;
-    });
-    setSelectedFilters(allCleared);
-  };
+  // Verificar si hay filtros activos (para mostrar badge rojo)
+  const hasActiveFilters = useMemo(() => {
+    const hasPropertyTypes = Object.values(selectedPropertyTypes).some(Boolean);
+    const hasOtherFilters =
+      advancedFilters.operationType ||
+      advancedFilters.currency ||
+      advancedFilters.minPrice ||
+      advancedFilters.maxPrice ||
+      advancedFilters.dormitorios_min ||
+      advancedFilters.baños_min ||
+      advancedFilters.city ||
+      advancedFilters.sortBy;
+    return hasPropertyTypes || Boolean(hasOtherFilters);
+  }, [selectedPropertyTypes, advancedFilters]);
 
-  const activeFilterCount = Object.values(selectedFilters).filter(Boolean).length;
 
-  // Filtrar propiedades según búsqueda y filtros de tipo
-  const filteredProperties = properties.filter((property) => {
-    const matchesSearch = property.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      property.address.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = selectedFilters[property.propertyType.toUpperCase()];
-    return matchesSearch && matchesFilter;
-  });
 
   useEffect(() => {
     loadProperties();
     loadFavorites();
   }, []);
+
+
 
   const loadFavorites = async () => {
     try {
@@ -752,16 +663,56 @@ export default function HomeScreen() {
 
   const loadProperties = async () => {
     try {
-      await fetchProperties({ page: 1, limit: 20 });
+      setCurrentPage(1);
+      setHasMore(true);
+      const response = await fetchProperties({ page: 1, limit: 3 });
+      if (response) {
+        setAllProperties(response.properties);
+        setHasMore(response.pagination.page < response.pagination.pages);
+      }
     } catch (err) {
       console.error('Error loading properties:', err);
+    }
+  };
+
+  const loadPropertiesWithFilters = async (filters?: PropertyFilters) => {
+    try {
+      // Usar filtros pasados como parámetro o los del estado
+      const filtersToUse = filters || advancedFilters;
+
+      // Construir filtros para enviar al backend
+      const activePropertyTypes = Object.keys(selectedPropertyTypes)
+        .filter(key => selectedPropertyTypes[key]);
+
+      const finalFilters: PropertyFilters = {
+        ...filtersToUse,
+        page: 1,
+        limit: 3,
+      };
+
+      // Solo agregar propertyType si hay algún tipo seleccionado
+      if (activePropertyTypes.length > 0) {
+        finalFilters.propertyType = activePropertyTypes[0]; // Por ahora solo el primero
+      }
+
+      console.log('[HomeScreen] Filtros a enviar:', JSON.stringify(finalFilters, null, 2));
+
+      setCurrentPage(1);
+      setHasMore(true);
+      const response = await fetchProperties(finalFilters);
+      if (response) {
+        setAllProperties(response.properties);
+        setHasMore(response.pagination.page < response.pagination.pages);
+      }
+    } catch (err) {
+      console.error('Error loading properties with filters:', err);
     }
   };
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await loadProperties();
+      await loadPropertiesWithFilters();
     } catch (err) {
       console.error('Error refreshing properties:', err);
     } finally {
@@ -769,33 +720,61 @@ export default function HomeScreen() {
     }
   };
 
-  // Función para obtener el color del filtro según tipo de propiedad
-  const getFilterButtonColor = (propertyType: string): string => {
-    switch (propertyType?.toUpperCase()) {
-      case 'HOUSE':
-        return '#5585b5'; // Azul
-      case 'APARTMENT':
-        return '#10b981'; // Verde
-      case 'OFFICE':
-        return '#f97316'; // Naranja
-      case 'LAND':
-        return '#f59e0b'; // Ámbar
-      case 'COMMERCIAL':
-        return '#8b5cf6'; // Púrpura
-      case 'WAREHOUSE':
-        return '#6366f1'; // Índigo
-      case 'ROOM':
-        return '#ec4899'; // Rosa
-      default:
-        return '#5585b5'; // Azul por defecto
+  const loadMoreProperties = useCallback(async () => {
+    // Protección contra llamadas duplicadas
+    if (!hasMore || isLoadingMoreRef.current || loading) {
+      return;
     }
-  };
 
-  const handlePropertyPress = (propertyId: string) => {
+    try {
+      isLoadingMoreRef.current = true;
+      setLoadingMore(true);
+      const nextPage = currentPage + 1;
+
+      // Construir filtros para la siguiente página
+      const activePropertyTypes = Object.keys(selectedPropertyTypes)
+        .filter(key => selectedPropertyTypes[key]);
+
+      const finalFilters: PropertyFilters = {
+        ...advancedFilters,
+        page: nextPage,
+        limit: 3, // Scroll infinito: cargas más pequeñas y frecuentes
+      };
+
+      if (activePropertyTypes.length > 0) {
+        finalFilters.propertyType = activePropertyTypes[0];
+      }
+
+      console.log('[HomeScreen] Cargando página:', nextPage);
+
+      const response = await fetchProperties(finalFilters);
+      if (response && response.properties) {
+        // Deduplicar: solo agregar propiedades que no existan ya
+        setAllProperties(prev => {
+          const existingIds = new Set(prev.map(p => p.id));
+          const newProperties = response.properties.filter(p => !existingIds.has(p.id));
+          return [...prev, ...newProperties];
+        });
+        setCurrentPage(nextPage);
+        setHasMore(response.pagination.page < response.pagination.pages);
+      }
+    } catch (err) {
+      console.error('Error loading more properties:', err);
+    } finally {
+      setLoadingMore(false);
+      isLoadingMoreRef.current = false;
+    }
+  }, [hasMore, loading, currentPage, selectedPropertyTypes, advancedFilters, fetchProperties]);
+
+  // ========================================
+  // Handlers (declarados ANTES de renderItem)
+  // ========================================
+
+  const handlePropertyPress = useCallback((propertyId: string) => {
     router.push(`/property-detail/${propertyId}`);
-  };
+  }, [router]);
 
-  const handleLike = async (propertyId: string, e: any) => {
+  const handleLike = useCallback(async (propertyId: string, e: any) => {
     e.stopPropagation();
 
     if (isGuest) {
@@ -833,10 +812,10 @@ export default function HomeScreen() {
 
       Alert.alert('⚠️ Error', errorMessage);
     }
-  };
+  }, [isGuest, likedProperties, removeFavorite, addFavorite, router]);
 
   // 🗺️ Abre selector nativo de apps de mapas
-  const handleOpenMap = (property: Property, e: any) => {
+  const handleOpenMap = useCallback((property: Property, e: any) => {
     e.stopPropagation();
     try {
       const { latitude, longitude, title } = property;
@@ -872,10 +851,10 @@ export default function HomeScreen() {
       console.error('Error abriendo mapas:', error);
       Alert.alert('Error', 'No se pudo abrir la aplicación de mapas');
     }
-  };
+  }, []);
 
   // 💬 Abre WhatsApp con el número del contacto
-  const handleOpenWhatsApp = (property: Property, e: any) => {
+  const handleOpenWhatsApp = useCallback((property: Property, e: any) => {
     e.stopPropagation();
     try {
       if (!property.contactPhone) {
@@ -902,10 +881,10 @@ export default function HomeScreen() {
       console.error('Error abriendo WhatsApp:', error);
       Alert.alert('Error', 'No se pudo abrir WhatsApp');
     }
-  };
+  }, []);
 
   // 📤 Comparte la publicación con deep link
-  const handleShare = async (property: Property, e: any) => {
+  const handleShare = useCallback(async (property: Property, e: any) => {
     e.stopPropagation();
     try {
       // Genera el deep link usando ExpoLinking.createURL()
@@ -938,7 +917,7 @@ ${deepLink}`;
       console.error('Error compartiendo:', error);
       Alert.alert('Error', 'No se pudo compartir la propiedad');
     }
-  };
+  }, []);
 
   const buildImageUrl = (imagePath: string | undefined) => {
     if (!imagePath) return null;
@@ -947,12 +926,19 @@ ${deepLink}`;
     return `${SERVER_BASE_URL}${cleanPath}`;
   };
 
-  const renderPropertyCard = (property: Property) => {
-    const isLiked = likedProperties.has(property.id);
+  // ========================================
+  // Render functions para FlatList
+  // ========================================
 
+  // keyExtractor optimizado para FlatList
+  const keyExtractor = useCallback((item: Property) => item.id, []);
+
+  // renderItem optimizado para FlatList
+  const renderItem = useCallback(({ item }: { item: Property }) => {
+    const isLiked = likedProperties.has(item.id);
     return (
       <PropertyCard
-        property={property}
+        property={item}
         styles={styles}
         isLiked={isLiked}
         onPropertyPress={handlePropertyPress}
@@ -960,12 +946,49 @@ ${deepLink}`;
         onOpenMap={handleOpenMap}
         onOpenWhatsApp={handleOpenWhatsApp}
         onShare={handleShare}
-        userAvatar={property.owner?.avatar}
-        userName={`${property.owner?.firstName} ${property.owner?.lastName}`}
+        userAvatar={item.owner?.avatar}
+        userName={`${item.owner?.firstName} ${item.owner?.lastName}`}
         isMobile={isMobile}
       />
     );
-  };
+  }, [likedProperties, styles, handlePropertyPress, handleLike, handleOpenMap, handleOpenWhatsApp, handleShare, isMobile]);
+
+  // Footer component para FlatList
+  const renderFooter = useCallback(() => {
+    if (loadingMore) {
+      return (
+        <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+          <ActivityIndicator size="small" color="#5585b5" />
+        </View>
+      );
+    }
+    if (!hasMore && allProperties.length > 0) {
+      return (
+        <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+          <Text style={{ color: '#94a3b8', fontSize: 14 }}>No hay más propiedades</Text>
+        </View>
+      );
+    }
+    return <View style={{ height: 20 }} />;
+  }, [loadingMore, hasMore, allProperties.length]);
+
+  // Empty component para FlatList
+  const renderEmpty = useCallback(() => {
+    if (loading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#5585b5" />
+          <Text style={styles.emptyText}>Cargando propiedades...</Text>
+        </View>
+      );
+    }
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={{ fontSize: 64 }}>🏠</Text>
+        <Text style={styles.emptyText}>No hay propiedades disponibles</Text>
+      </View>
+    );
+  }, [loading, styles]);
 
   return (
     <SafeAreaView style={styles.safeContainer}>
@@ -973,25 +996,22 @@ ${deepLink}`;
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.headerContainer}>
-          <Image
-            source={require('@/assets/logos/NormalLogo.jpeg')}
-            style={styles.headerLogo}
-            resizeMode="contain"
-          />
-
-          <View style={styles.searchContainer}>
-            <Text style={styles.searchIcon}>🔍</Text>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Buscar propiedades..."
-              placeholderTextColor="#94a3b8"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
+          <View style={styles.headerContent}>
+            <Image
+              source={require('@/assets/logos/NormalLogo.jpeg')}
+              style={styles.headerLogo}
+              resizeMode="contain"
             />
+            <TouchableOpacity
+              style={styles.searchButton}
+              onPress={() => router.push('/search')}
+            >
+              <Ionicons name="search" size={24} color="#5585b5" />
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Botón de Filtros */}
+        {/* Botón de Filtros con badge rojo simple */}
         <View style={styles.filterButtonContainer}>
           <TouchableOpacity
             style={styles.filterButton}
@@ -999,86 +1019,43 @@ ${deepLink}`;
           >
             <Ionicons name="filter" size={20} color="#5585b5" />
             <Text style={styles.filterButtonText}>Filtros</Text>
-            {activeFilterCount < propertyTypes.length && (
-              <View style={styles.filterBadge}>
-                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
-              </View>
+            {hasActiveFilters && (
+              <View style={styles.filterBadge} />
             )}
           </TouchableOpacity>
         </View>
 
         {/* Modal de Filtros */}
-        <Modal
+        <FiltersModal
           visible={filterModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setFilterModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Filtrar por tipo</Text>
-                <TouchableOpacity onPress={() => setFilterModalVisible(false)}>
-                  <Ionicons name="close" size={24} color="#1f2937" />
-                </TouchableOpacity>
-              </View>
+          onClose={() => setFilterModalVisible(false)}
+          filters={advancedFilters}
+          onApplyFilters={handleApplyFilters}
+          selectedPropertyTypes={selectedPropertyTypes}
+          onTogglePropertyType={togglePropertyTypeFilter}
+        />
 
-              {/* Lista de filtros */}
-              <ScrollView style={styles.filtersList}>
-                {propertyTypes.map((pt) => (
-                  <TouchableOpacity
-                    key={pt.type}
-                    style={styles.filterItemContainer}
-                    onPress={() => toggleFilter(pt.type)}
-                  >
-                    <View
-                      style={[
-                        styles.checkbox,
-                        selectedFilters[pt.type] && {
-                          backgroundColor: getFilterButtonColor(pt.type),
-                          borderColor: getFilterButtonColor(pt.type),
-                        }
-                      ]}
-                    >
-                      {selectedFilters[pt.type] && (
-                        <Ionicons name="checkmark" size={16} color="#ffffff" />
-                      )}
-                    </View>
-                    <Text style={styles.filterItemLabel}>{pt.label}</Text>
-                    <View
-                      style={[
-                        styles.colorIndicator,
-                        { backgroundColor: getFilterButtonColor(pt.type) }
-                      ]}
-                    />
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              {/* Botones de acción */}
-              <View style={styles.modalFooter}>
-                <TouchableOpacity
-                  style={styles.filterActionButton}
-                  onPress={clearAllFilters}
-                >
-                  <Text style={styles.filterActionButtonText}>Limpiar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.filterActionButton, styles.filterActionButtonPrimary]}
-                  onPress={selectAllFilters}
-                >
-                  <Text style={styles.filterActionButtonPrimaryText}>Seleccionar Todo</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Feed tipo Instagram */}
-        <ScrollView
+        {/* Feed tipo Instagram con FlatList (virtualizado) */}
+        <FlatList
+          ref={flatListRef}
+          data={allProperties}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          contentContainerStyle={{ paddingVertical: isMobile ? 12 : 16, alignItems: 'center' }}
           style={styles.feedContainer}
           showsVerticalScrollIndicator={false}
-          scrollEventThrottle={16}
+          // Scroll infinito optimizado
+          onEndReached={loadMoreProperties}
+          onEndReachedThreshold={0.5} // Cargar cuando estés al 50% del final
+          ListFooterComponent={renderFooter}
+          ListEmptyComponent={renderEmpty}
+          // Optimizaciones de performance para scroll suave
+          removeClippedSubviews={Platform.OS === 'android'} // Solo Android
+          maxToRenderPerBatch={2} // Renderizar de a 2 en vez de 3
+          updateCellsBatchingPeriod={100} // Más tiempo entre updates = menos jank
+          windowSize={3} // Solo 3 pantallas en memoria (reducido de 5)
+          initialNumToRender={3} // Renderizar exactamente los 3 items iniciales
+          // Pull to refresh
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -1086,42 +1063,15 @@ ${deepLink}`;
               tintColor="#5585b5"
             />
           }
-        >
-          {/* Error Message */}
-          {error && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>⚠️ {error}</Text>
-            </View>
-          )}
-
-          {/* Loading State */}
-          {loading && properties.length === 0 ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#5585b5" />
-              <Text style={styles.emptyText}>Cargando propiedades...</Text>
-            </View>
-          ) : properties.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={{ fontSize: 64 }}>🏠</Text>
-              <Text style={styles.emptyText}>No hay propiedades disponibles</Text>
-            </View>
-          ) : filteredProperties.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={{ fontSize: 64 }}>🔍</Text>
-              <Text style={styles.emptyText}>No hay propiedades que coincidan con los filtros</Text>
-            </View>
-          ) : (
-            <View style={{ width: '100%', alignItems: 'center', paddingVertical: 8 }}>
-              {filteredProperties.map((property) => (
-                <View key={property.id}>
-                  {renderPropertyCard(property)}
-                </View>
-              ))}
-              {/* Espaciador al final */}
-              <View style={{ height: 20 }} />
-            </View>
-          )}
-        </ScrollView>
+          // Header con mensajes de error
+          ListHeaderComponent={
+            error ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>⚠️ {error}</Text>
+              </View>
+            ) : null
+          }
+        />
       </View>
     </SafeAreaView>
   );

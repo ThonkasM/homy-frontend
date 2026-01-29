@@ -63,7 +63,7 @@ export const PROPERTY_TYPES_CONFIG: Record<string, PropertyTypeConfig> = {
                 max: 50,
             },
             {
-                
+
                 key: 'dormitorios',
                 label: 'Dormitorios',
                 type: 'number',
@@ -87,7 +87,7 @@ export const PROPERTY_TYPES_CONFIG: Record<string, PropertyTypeConfig> = {
                 min: 0,
                 unit: 'Bs.',
             },
-           
+
             {
                 key: 'garage',
                 label: 'Tiene garage',
@@ -145,7 +145,7 @@ export const PROPERTY_TYPES_CONFIG: Record<string, PropertyTypeConfig> = {
                 min: 1,
                 max: 10,
             },
-            
+
             {
                 key: 'garage',
                 label: 'Lugares de Garaje',
@@ -272,7 +272,7 @@ export const PROPERTY_TYPES_CONFIG: Record<string, PropertyTypeConfig> = {
             },
             {
                 key: 'frente',
-                label: 'Frente (metros)',
+                label: 'Frente',
                 type: 'decimal',
                 required: false,
                 min: 1,
@@ -280,7 +280,7 @@ export const PROPERTY_TYPES_CONFIG: Record<string, PropertyTypeConfig> = {
             },
             {
                 key: 'fondo',
-                label: 'Fondo (metros)',
+                label: 'Fondo',
                 type: 'decimal',
                 required: false,
                 min: 1,

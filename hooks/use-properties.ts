@@ -42,21 +42,93 @@ export interface PropertiesResponse {
     };
 }
 
+// Interfaz de filtros completa basada en FilterPropertyDto del backend
+export interface PropertyFilters {
+    propertyType?: string;
+    operationType?: 'SALE' | 'RENT_TEMPORARY' | 'RENT_PERMANENT' | 'ANTICRETICO';
+    status?: 'AVAILABLE' | 'RESERVED' | 'SOLD' | 'RENTED' | 'INACTIVE';
+    postStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+    currency?: 'BOB' | 'USD' | 'ARS' | 'PEN' | 'CLP' | 'MXN' | 'COP';
+    search?: string;
+    amenities?: string[];
+
+    // Filtros de precio
+    minPrice?: number;
+    maxPrice?: number;
+
+    // Filtros de specifications (ahora directos, no en objeto anidado)
+    // Dormitorios
+    dormitorios_min?: number;
+    dormitorios_max?: number;
+    dormitorios?: number;
+
+    // Baños
+    baños_min?: number;
+    baños_max?: number;
+    baños?: number;
+
+    // Área
+    area_min?: number;
+    area_max?: number;
+
+    // Área construida
+    areaBuilt_min?: number;
+    areaBuilt_max?: number;
+
+    // Garage/Estacionamiento
+    garage_min?: number;
+    estacionamiento_min?: number;
+
+    // Expensas
+    expensas_min?: number;
+    expensas_max?: number;
+
+    // Piso
+    piso_min?: number;
+    piso_max?: number;
+
+    // Campos booleanos
+    jardin?: boolean;
+    patio?: boolean;
+    balcon?: boolean;
+    esquina?: boolean;
+
+    // Topografía (para terrenos)
+    topografia?: string;
+
+    // Filtros de ubicación
+    city?: string;
+    state?: string;
+    latitude?: number;
+    longitude?: number;
+    radius?: number;
+
+    // Paginación
+    page?: number;
+    limit?: number;
+
+    // Ordenamiento
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+
+    // Legacy fields (deprecados, solo para compatibilidad)
+    bedrooms?: number;
+    bathrooms?: number;
+
+}
+
 export const useProperties = () => {
     const [properties, setProperties] = useState<Property[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const fetchProperties = useCallback(
-        async (filters?: { page?: number; limit?: number }) => {
+        async (filters?: PropertyFilters) => {
             try {
                 setLoading(true);
                 setError(null);
 
-                const data = await apiService.getProperties({
-                    page: filters?.page || 1,
-                    limit: filters?.limit || 10,
-                });
+                const data = await apiService.getProperties(filters || {});
 
                 if (data?.properties) {
                     setProperties(data.properties);
@@ -98,7 +170,7 @@ export const useProperties = () => {
                 setLoading(true);
                 setError(null);
 
-                const data = await apiService.getUserProperties({
+                const data = await apiService.getMyProperties({
                     page: filters?.page || 1,
                     limit: filters?.limit || 10,
                 });

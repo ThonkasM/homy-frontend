@@ -238,25 +238,6 @@ export default function WelcomeScreen() {
             </Text>
           </View>
 
-          {/* Features */}
-          <View style={styles.featureContainer}>
-            <View style={styles.featureGrid}>
-              <View style={styles.featureCard}>
-                <Text style={styles.featureIcon}>🔍</Text>
-                <Text style={styles.featureLabel}>Buscar</Text>
-              </View>
-              <View style={styles.featureCard}>
-                <Text style={styles.featureIcon}>🏠</Text>
-                <Text style={styles.featureLabel}>Explorar</Text>
-              </View>
-              <View style={styles.featureCard}>
-                <Text style={styles.featureIcon}>💬</Text>
-                <Text style={styles.featureLabel}>Contactar</Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.dividerLine} />
 
           {/* Buttons */}
           <View style={styles.buttonContainer}>
@@ -287,7 +268,7 @@ export default function WelcomeScreen() {
 
           {/* Footer */}
           <View style={styles.footer}>
-            <Text style={styles.footerText}>© 2025 Homi. Todos los derechos reservados.</Text>
+            <Text style={styles.footerText}>© 2026 HO-MY. Todos los derechos reservados.</Text>
           </View>
         </View>
       </ScrollView>

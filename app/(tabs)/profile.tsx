@@ -549,6 +549,9 @@ export default function ProfileScreen() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [activeTab, setActiveTab] = useState<'properties' | 'favorites'>('properties');
   const [showMenu, setShowMenu] = useState(false);
+  const [editingBio, setEditingBio] = useState(user?.bio || '');
+  const [updatingProfile, setUpdatingProfile] = useState(false);
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const alertShownRef = useRef(false);
 
@@ -745,8 +748,7 @@ export default function ProfileScreen() {
   };
 
   const handleEditProperty = (propertyId: string) => {
-    // TODO: Implementar pantalla de edición
-    Alert.alert('Info', 'La edición de propiedades estará disponible próximamente');
+    router.push(`/edit-property/${propertyId}`);
   };
 
   const handleLogout = () => {

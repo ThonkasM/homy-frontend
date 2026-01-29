@@ -205,24 +205,91 @@ class ApiService {
     // ==========================================
 
     /**
-     * Obtener todas las propiedades con paginación y filtros
+     * Obtener todas las propiedades con paginación y filtros completos
      */
-    async getProperties(filters?: {
-        page?: number;
-        limit?: number;
-        propertyType?: string;
-        operationType?: string;
-        minPrice?: number;
-        maxPrice?: number;
-    }) {
+    async getProperties(filters?: PropertyFilters) {
         try {
             const params = new URLSearchParams();
+
+            // Parámetros básicos
             if (filters?.page) params.append('page', filters.page.toString());
             if (filters?.limit) params.append('limit', filters.limit.toString());
+
+            // Filtros de tipo
             if (filters?.propertyType) params.append('propertyType', filters.propertyType);
             if (filters?.operationType) params.append('operationType', filters.operationType);
+            if (filters?.status) params.append('status', filters.status);
+            if (filters?.postStatus) params.append('postStatus', filters.postStatus);
+            if (filters?.currency) params.append('currency', filters.currency);
+
+            // Búsqueda de texto
+            if (filters?.search) params.append('search', filters.search);
+
+            // Filtros numéricos de precio
             if (filters?.minPrice) params.append('minPrice', filters.minPrice.toString());
             if (filters?.maxPrice) params.append('maxPrice', filters.maxPrice.toString());
+
+            // Filtros de ubicación
+            if (filters?.city) params.append('city', filters.city);
+            if (filters?.state) params.append('state', filters.state);
+            if (filters?.latitude) params.append('latitude', filters.latitude.toString());
+            if (filters?.longitude) params.append('longitude', filters.longitude.toString());
+            if (filters?.radius) params.append('radius', filters.radius.toString());
+
+            // Amenidades (array)
+            if (filters?.amenities && filters.amenities.length > 0) {
+                filters.amenities.forEach(amenity => {
+                    params.append('amenities[]', amenity);
+                });
+            }
+
+            // Filtros de specifications (ahora directos, no en objeto anidado)
+            // Dormitorios
+            if (filters?.dormitorios_min !== undefined) params.append('dormitorios_min', filters.dormitorios_min.toString());
+            if (filters?.dormitorios_max !== undefined) params.append('dormitorios_max', filters.dormitorios_max.toString());
+            if (filters?.dormitorios !== undefined) params.append('dormitorios', filters.dormitorios.toString());
+
+            // Baños
+            if (filters?.baños_min !== undefined) params.append('baños_min', filters.baños_min.toString());
+            if (filters?.baños_max !== undefined) params.append('baños_max', filters.baños_max.toString());
+            if (filters?.baños !== undefined) params.append('baños', filters.baños.toString());
+
+            // Área
+            if (filters?.area_min !== undefined) params.append('area_min', filters.area_min.toString());
+            if (filters?.area_max !== undefined) params.append('area_max', filters.area_max.toString());
+
+            // Área construida
+            if (filters?.areaBuilt_min !== undefined) params.append('areaBuilt_min', filters.areaBuilt_min.toString());
+            if (filters?.areaBuilt_max !== undefined) params.append('areaBuilt_max', filters.areaBuilt_max.toString());
+
+            // Garage/Estacionamiento
+            if (filters?.garage_min !== undefined) params.append('garage_min', filters.garage_min.toString());
+            if (filters?.estacionamiento_min !== undefined) params.append('estacionamiento_min', filters.estacionamiento_min.toString());
+
+            // Expensas
+            if (filters?.expensas_min !== undefined) params.append('expensas_min', filters.expensas_min.toString());
+            if (filters?.expensas_max !== undefined) params.append('expensas_max', filters.expensas_max.toString());
+
+            // Piso
+            if (filters?.piso_min !== undefined) params.append('piso_min', filters.piso_min.toString());
+            if (filters?.piso_max !== undefined) params.append('piso_max', filters.piso_max.toString());
+
+            // Campos booleanos
+            if (filters?.jardin !== undefined) params.append('jardin', filters.jardin.toString());
+            if (filters?.patio !== undefined) params.append('patio', filters.patio.toString());
+            if (filters?.balcon !== undefined) params.append('balcon', filters.balcon.toString());
+            if (filters?.esquina !== undefined) params.append('esquina', filters.esquina.toString());
+
+            // Topografía
+            if (filters?.topografia) params.append('topografia', filters.topografia);
+
+            // Legacy fields (para compatibilidad)
+            if (filters?.bedrooms) params.append('bedrooms', filters.bedrooms.toString());
+            if (filters?.bathrooms) params.append('bathrooms', filters.bathrooms.toString());
+
+            // Ordenamiento
+            if (filters?.sortBy) params.append('sortBy', filters.sortBy);
+            if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
 
             const url = `${API_BASE_URL}/properties${params.toString() ? '?' + params.toString() : ''}`;
             console.log('[apiService] getProperties URL:', url);
@@ -262,7 +329,7 @@ class ApiService {
     /**
      * Obtener propiedades del usuario autenticado
      */
-    async getUserProperties(filters?: { page?: number; limit?: number }) {
+    async getMyProperties(filters?: { page?: number; limit?: number }) {
         try {
             const params = new URLSearchParams();
             if (filters?.page) params.append('page', filters.page.toString());
@@ -567,6 +634,158 @@ class ApiService {
             return data;
         } catch (error: any) {
             console.error('❌ Error archivando propiedad:', error);
+            throw error;
+        }
+    }
+
+    // ==========================================
+    // EDICIÓN DE PROPIEDADES
+    // ==========================================
+
+    /**
+     * Actualizar propiedad con nuevos archivos multimedia
+     * PATCH /api/properties/:id/with-media
+     */
+    async updatePropertyWithMedia(propertyId: string, formData: FormData) {
+        try {
+            console.log('📝 [updatePropertyWithMedia] Actualizando propiedad:', propertyId);
+            const response = await fetch(`${API_BASE_URL}/properties/${propertyId}/with-media`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': this.token ? `Bearer ${this.token}` : '',
+                    // No establecer Content-Type, FormData lo hace automáticamente
+                },
+                body: formData,
+            });
+
+            const data = await this.handleResponse(response);
+            console.log('✅ Propiedad actualizada con media:', data);
+            return data;
+        } catch (error: any) {
+            console.error('❌ Error actualizando propiedad con media:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Eliminar un archivo multimedia específico
+     * DELETE /api/properties/:propertyId/media/:mediaId
+     */
+    async deletePropertyMedia(propertyId: string, mediaId: string) {
+        try {
+            console.log('🗑️ [deletePropertyMedia] Eliminando archivo:', { propertyId, mediaId });
+            const response = await fetch(`${API_BASE_URL}/properties/${propertyId}/media/${mediaId}`, {
+                method: 'DELETE',
+                headers: this.getHeaders(),
+            });
+
+            const data = await this.handleResponse(response);
+            console.log('✅ Archivo eliminado:', data);
+            return data;
+        } catch (error: any) {
+            console.error('❌ Error eliminando archivo:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Reordenar archivos multimedia de una propiedad
+     * PATCH /api/properties/:id/media/reorder
+     */
+    async reorderPropertyMedia(propertyId: string, mediaIds: string[]) {
+        try {
+            console.log('🔄 [reorderPropertyMedia] Reordenando archivos:', { propertyId, mediaIds });
+            const response = await fetch(`${API_BASE_URL}/properties/${propertyId}/media/reorder`, {
+                method: 'PATCH',
+                headers: this.getHeaders(),
+                body: JSON.stringify({ mediaIds }),
+            });
+
+            const data = await this.handleResponse(response);
+            console.log('✅ Archivos reordenados:', data);
+            return data;
+        } catch (error: any) {
+            console.error('❌ Error reordenando archivos:', error);
+            throw error;
+        }
+    }
+
+    // ==========================================
+    // USUARIOS
+    // ==========================================
+
+    /**
+     * Buscar usuarios por nombre, email o ciudad
+     * GET /api/users?search=...&page=1&limit=10
+     */
+    async searchUsers(filters?: {
+        search?: string;
+        city?: string;
+        page?: number;
+        limit?: number;
+    }) {
+        try {
+            const params = new URLSearchParams();
+
+            if (filters?.search) params.append('search', filters.search);
+            if (filters?.city) params.append('city', filters.city);
+            if (filters?.page) params.append('page', filters.page.toString());
+            if (filters?.limit) params.append('limit', filters.limit.toString());
+
+            const url = `${API_BASE_URL}/users${params.toString() ? '?' + params.toString() : ''}`;
+            console.log('[apiService] searchUsers URL:', url);
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: this.getHeaders(),
+            });
+
+            return this.handleResponse(response);
+        } catch (error: any) {
+            console.error('Error buscando usuarios:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Obtener perfil público de un usuario
+     * GET /api/users/:id
+     */
+    async getUserProfile(userId: string) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+                method: 'GET',
+                headers: this.getHeaders(),
+            });
+
+            return this.handleResponse(response);
+        } catch (error: any) {
+            console.error('Error obteniendo perfil de usuario:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Obtener propiedades de un usuario
+     * GET /api/users/:id/properties?page=1&limit=10
+     */
+    async getUserProperties(userId: string, page = 1, limit = 10) {
+        try {
+            const params = new URLSearchParams();
+            params.append('page', page.toString());
+            params.append('limit', limit.toString());
+
+            const url = `${API_BASE_URL}/users/${userId}/properties?${params.toString()}`;
+            console.log('[apiService] getUserProperties URL:', url);
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: this.getHeaders(),
+            });
+
+            return this.handleResponse(response);
+        } catch (error: any) {
+            console.error('Error obteniendo propiedades del usuario:', error);
             throw error;
         }
     }

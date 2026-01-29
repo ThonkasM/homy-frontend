@@ -6,6 +6,8 @@ import { useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    KeyboardAvoidingView,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -198,110 +200,118 @@ export default function EditProfileScreen() {
                 <Text style={styles.headerTitle}>Editar Perfil</Text>
             </View>
 
-            <ScrollView
-                style={styles.container}
-                showsVerticalScrollIndicator={false}
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
             >
-                <View style={styles.contentContainer}>
-                    {/* Nombre */}
-                    <View style={styles.formGroup}>
-                        <Text style={styles.label}>Nombre</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Tu nombre"
-                            placeholderTextColor="#94a3b8"
-                            value={firstName}
-                            onChangeText={setFirstName}
-                            editable={!updating}
-                        />
-                    </View>
+                <ScrollView
+                    style={styles.container}
+                    contentContainerStyle={{ paddingBottom: 40 }}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    <View style={styles.contentContainer}>
+                        {/* Nombre */}
+                        <View style={styles.formGroup}>
+                            <Text style={styles.label}>Nombre</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Tu nombre"
+                                placeholderTextColor="#94a3b8"
+                                value={firstName}
+                                onChangeText={setFirstName}
+                                editable={!updating}
+                            />
+                        </View>
 
-                    {/* Apellido */}
-                    <View style={styles.formGroup}>
-                        <Text style={styles.label}>Apellido</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Tu apellido"
-                            placeholderTextColor="#94a3b8"
-                            value={lastName}
-                            onChangeText={setLastName}
-                            editable={!updating}
-                        />
-                    </View>
+                        {/* Apellido */}
+                        <View style={styles.formGroup}>
+                            <Text style={styles.label}>Apellido</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Tu apellido"
+                                placeholderTextColor="#94a3b8"
+                                value={lastName}
+                                onChangeText={setLastName}
+                                editable={!updating}
+                            />
+                        </View>
 
-                    {/* Email */}
-                    <View style={styles.formGroup}>
-                        <Text style={styles.label}>Correo Electrónico</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="tu@email.com"
-                            placeholderTextColor="#94a3b8"
-                            value={email}
-                            onChangeText={setEmail}
-                            keyboardType="email-address"
-                            editable={!updating}
-                        />
-                    </View>
+                        {/* Email */}
+                        <View style={styles.formGroup}>
+                            <Text style={styles.label}>Correo Electrónico</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="tu@email.com"
+                                placeholderTextColor="#94a3b8"
+                                value={email}
+                                onChangeText={setEmail}
+                                keyboardType="email-address"
+                                editable={!updating}
+                            />
+                        </View>
 
-                    {/* Teléfono */}
-                    <View style={styles.formGroup}>
-                        <Text style={styles.label}>Teléfono</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="+591 12345678"
-                            placeholderTextColor="#94a3b8"
-                            value={phone}
-                            onChangeText={setPhone}
-                            keyboardType="phone-pad"
-                            editable={!updating}
-                        />
-                    </View>
+                        {/* Teléfono */}
+                        <View style={styles.formGroup}>
+                            <Text style={styles.label}>Teléfono</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="+591 12345678"
+                                placeholderTextColor="#94a3b8"
+                                value={phone}
+                                onChangeText={setPhone}
+                                keyboardType="phone-pad"
+                                editable={!updating}
+                            />
+                        </View>
 
-                    {/* Bio */}
-                    <View style={styles.formGroup}>
-                        <Text style={styles.label}>Acerca de mí</Text>
-                        <TextInput
-                            style={styles.inputMultiline}
-                            placeholder="Cuéntanos sobre ti..."
-                            placeholderTextColor="#94a3b8"
-                            value={bio}
-                            onChangeText={setBio}
-                            multiline
-                            maxLength={500}
-                            editable={!updating}
-                        />
-                        <Text style={styles.charCount}>
-                            {bio.length}/500
-                        </Text>
-                    </View>
-
-                    {/* Botones */}
-                    <View style={styles.buttonContainer}>
-                        <TouchableOpacity
-                            style={[styles.button, styles.buttonCancel]}
-                            onPress={() => router.back()}
-                            disabled={updating}
-                        >
-                            <Text style={[styles.buttonText, styles.buttonTextCancel]}>
-                                Cancelar
+                        {/* Bio */}
+                        <View style={styles.formGroup}>
+                            <Text style={styles.label}>Acerca de mí</Text>
+                            <TextInput
+                                style={styles.inputMultiline}
+                                placeholder="Cuéntanos sobre ti..."
+                                placeholderTextColor="#94a3b8"
+                                value={bio}
+                                onChangeText={setBio}
+                                multiline
+                                maxLength={500}
+                                editable={!updating}
+                            />
+                            <Text style={styles.charCount}>
+                                {bio.length}/500
                             </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.button, styles.buttonSave]}
-                            onPress={handleSaveProfile}
-                            disabled={updating}
-                        >
-                            {updating ? (
-                                <ActivityIndicator size="small" color="#ffffff" />
-                            ) : (
-                                <Text style={[styles.buttonText, styles.buttonTextSave]}>
-                                    Guardar Cambios
+                        </View>
+
+                        {/* Botones */}
+                        <View style={styles.buttonContainer}>
+                            <TouchableOpacity
+                                style={[styles.button, styles.buttonCancel]}
+                                onPress={() => router.back()}
+                                disabled={updating}
+                            >
+                                <Text style={[styles.buttonText, styles.buttonTextCancel]}>
+                                    Cancelar
                                 </Text>
-                            )}
-                        </TouchableOpacity>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.button, styles.buttonSave]}
+                                onPress={handleSaveProfile}
+                                disabled={updating}
+                            >
+                                {updating ? (
+                                    <ActivityIndicator size="small" color="#ffffff" />
+                                ) : (
+                                    <Text style={[styles.buttonText, styles.buttonTextSave]}>
+                                        Guardar Cambios
+                                    </Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
                     </View>
-                </View>
-            </ScrollView>
+                </ScrollView>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 }
