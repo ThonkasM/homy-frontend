@@ -246,7 +246,10 @@ export default function CreatePostScreen() {
     if (!files) return;
 
     const newMedia: MediaItem[] = [];
-    for (let i = 0; i < Math.min(files.length, 10); i++) {
+    let processedCount = 0;
+    const totalFiles = Math.min(files.length, 10 - selectedMedia.length);
+
+    for (let i = 0; i < totalFiles; i++) {
       const file = files[i];
       const isVideo = file.type.startsWith('video/');
       const reader = new FileReader();
@@ -256,11 +259,17 @@ export default function CreatePostScreen() {
         newMedia.push({
           uri,
           type: isVideo ? 'video' : 'image',
+          file: file, // Guardar el objeto File original
         });
 
-        if (newMedia.length === i + 1) {
+        processedCount++;
+        if (processedCount === totalFiles) {
           if (selectedMedia.length + newMedia.length > 10) {
-            Alert.alert('Límite alcanzado', 'Máximo 10 archivos permitidos');
+            if (Platform.OS === 'web') {
+              window.alert('Límite alcanzado: Máximo 10 archivos permitidos');
+            } else {
+              Alert.alert('Límite alcanzado', 'Máximo 10 archivos permitidos');
+            }
             return;
           }
           setSelectedMedia(prev => sortMediaItems([...prev, ...newMedia]));
@@ -278,12 +287,20 @@ export default function CreatePostScreen() {
 
   const handlePublish = async (postStatus: 'DRAFT' | 'PUBLISHED') => {
     if (!formData.title || !formData.description || !formData.price) {
-      Alert.alert('Error', 'Por favor completa los campos obligatorios: Título, Descripción y Precio');
+      if (Platform.OS === 'web') {
+        window.alert('Por favor completa los campos obligatorios: Título, Descripción y Precio');
+      } else {
+        Alert.alert('Error', 'Por favor completa los campos obligatorios: Título, Descripción y Precio');
+      }
       return;
     }
 
     if (selectedMedia.length === 0) {
-      Alert.alert('Error', 'Debes agregar al menos una imagen o video');
+      if (Platform.OS === 'web') {
+        window.alert('Debes agregar al menos una imagen o video');
+      } else {
+        Alert.alert('Error', 'Debes agregar al menos una imagen o video');
+      }
       return;
     }
 
@@ -293,7 +310,11 @@ export default function CreatePostScreen() {
         formData.specifications,
       );
       if (!specValidation.valid) {
-        Alert.alert('Error de validación', specValidation.errors.join('\n'));
+        if (Platform.OS === 'web') {
+          window.alert('Error de validación:\n' + specValidation.errors.join('\n'));
+        } else {
+          Alert.alert('Error de validación', specValidation.errors.join('\n'));
+        }
         return;
       }
 
@@ -302,7 +323,11 @@ export default function CreatePostScreen() {
         formData.amenities,
       );
       if (!amenitiesValidation.valid) {
-        Alert.alert('Error de validación', amenitiesValidation.errors.join('\n'));
+        if (Platform.OS === 'web') {
+          window.alert('Error de validación:\n' + amenitiesValidation.errors.join('\n'));
+        } else {
+          Alert.alert('Error de validación', amenitiesValidation.errors.join('\n'));
+        }
         return;
       }
     }
@@ -342,20 +367,30 @@ export default function CreatePostScreen() {
       console.log('   Media items:', selectedMedia.length);
 
       selectedMedia.forEach((media, index) => {
-        const filename = media.uri.split('/').pop() || `${media.type}_${index}`;
-        const isVideo = media.type === 'video';
-        const match = /\.(\w+)$/.exec(filename);
-        const extension = match ? match[1] : (isVideo ? 'mp4' : 'jpeg');
-        const mimeType = isVideo ? `video/${extension}` : `image/${extension}`;
-
-        console.log(`   ${isVideo ? 'Video' : 'Imagen'} ${index + 1}:`, { filename, mimeType, uri: media.uri });
-
-        // @ts-ignore
-        data.append('files', {
-          uri: media.uri,
-          name: filename,
-          type: mimeType,
+        console.log(`   ${media.type === 'video' ? 'Video' : 'Imagen'} ${index + 1}:`, {
+          type: media.type,
+          hasFile: !!media.file,
+          uri: media.uri.substring(0, 50) + '...'
         });
+
+        if (Platform.OS === 'web' && media.file) {
+          // En web, usar el objeto File original
+          data.append('files', media.file);
+        } else {
+          // En mobile, usar el formato uri/name/type
+          const filename = media.uri.split('/').pop() || `${media.type}_${index}`;
+          const isVideo = media.type === 'video';
+          const match = /\.(\w+)$/.exec(filename);
+          const extension = match ? match[1] : (isVideo ? 'mp4' : 'jpeg');
+          const mimeType = isVideo ? `video/${extension}` : `image/${extension}`;
+
+          // @ts-ignore
+          data.append('files', {
+            uri: media.uri,
+            name: filename,
+            type: mimeType,
+          });
+        }
       });
 
       const response = await apiService.createPropertyWithImages(data);
@@ -369,33 +404,44 @@ export default function CreatePostScreen() {
         ? 'Borrador guardado correctamente'
         : 'Tu propiedad ha sido publicada correctamente';
 
-      Alert.alert('Éxito', successMessage, [
-        {
-          text: 'OK',
-          onPress: () => {
-            setFormData({
-              title: '',
-              description: '',
-              price: '',
-              currency: 'BOB',
-              propertyType: 'APARTMENT',
-              operationType: 'SALE',
-              address: '',
-              city: '',
-              latitude: '',
-              longitude: '',
-              contactPhone: '',
-              amenities: [],
-              specifications: {},
-            });
-            setSelectedMedia([]);
-            router.push('/(tabs)/profile?refresh=true');
+      // Resetear formulario
+      setFormData({
+        title: '',
+        description: '',
+        price: '',
+        currency: 'BOB',
+        propertyType: 'APARTMENT',
+        operationType: 'SALE',
+        address: '',
+        city: '',
+        latitude: '',
+        longitude: '',
+        contactPhone: '',
+        amenities: [],
+        specifications: {},
+      });
+      setSelectedMedia([]);
+
+      if (Platform.OS === 'web') {
+        window.alert(successMessage);
+        router.push('/(tabs)/profile?refresh=true');
+      } else {
+        Alert.alert('Éxito', successMessage, [
+          {
+            text: 'OK',
+            onPress: () => {
+              router.push('/(tabs)/profile?refresh=true');
+            },
           },
-        },
-      ]);
+        ]);
+      }
     } catch (error: any) {
       console.error('Error publicando propiedad:', error);
-      Alert.alert('Error', error.message || 'No se pudo guardar la propiedad');
+      if (Platform.OS === 'web') {
+        window.alert('Error: ' + (error.message || 'No se pudo guardar la propiedad'));
+      } else {
+        Alert.alert('Error', error.message || 'No se pudo guardar la propiedad');
+      }
     } finally {
       setIsSubmitting(false);
     }

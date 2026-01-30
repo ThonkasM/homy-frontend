@@ -5,6 +5,7 @@ export interface MediaItem {
     uri: string;
     type: 'image' | 'video';
     duration?: number;
+    file?: File; // Para web: objeto File original
 }
 
 interface MediaUploaderProps {
