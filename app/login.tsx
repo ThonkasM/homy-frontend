@@ -1,7 +1,12 @@
+import AuthFooter from "@/components/auth/auth-footer";
+import LoginButton from "@/components/auth/login-button";
+import LoginForm from "@/components/auth/login-form";
+import LoginHeader from "@/components/auth/login-header";
+import LoginTitle from "@/components/auth/login-title";
 import { useAuth } from "@/context/auth-context";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const styles = StyleSheet.create({
@@ -224,8 +229,8 @@ export default function LoginScreen() {
         try {
             clearError();
             await login(email, password);
-            // El login fue exitoso, el navegador se encargará de redirigir
-            // (vamos a manejar esto con un componente protegido)
+            // Login exitoso, navegar al home
+            router.replace('/(tabs)/home');
         } catch (err: any) {
             Alert.alert("Error de Login", error || "No pudimos iniciar sesión. Por favor intenta de nuevo.");
         }
@@ -244,97 +249,16 @@ export default function LoginScreen() {
                     keyboardShouldPersistTaps="handled"
                 >
                     <View style={styles.container}>
-                        {/* Top Section - Logo & Brand */}
-                        <View style={styles.topSection}>
-                            <View style={styles.logoContainer}>
-                                <Image
-                                    source={require('@/assets/logos/BigLogo.jpeg')}
-                                    style={styles.logoImage}
-                                    resizeMode="contain"
-                                />
-                            </View>
-                        </View>
-
-                        {/* Header Section */}
-                        <View style={styles.headerSection}>
-                            <Text style={styles.headerTitle}>
-                                Accede a tu Cuenta
-                            </Text>
-                            <Text style={styles.headerSubtitle}>
-                                Gestiona tus propiedades y solicitudes
-                            </Text>
-                        </View>
-
-                        {/* Form Container */}
-                        <View style={styles.formContainer}>
-                            {/* Email Input */}
-                            <Text style={styles.fieldLabel}>Correo Electrónico</Text>
-                            <TextInput
-                                style={styles.emailInput}
-                                placeholder="tu@email.com"
-                                placeholderTextColor="#cbd5e1"
-                                value={email}
-                                onChangeText={setEmail}
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                                editable={!isLoading}
-                            />
-
-                            {/* Password Input */}
-                            <Text style={styles.fieldLabel}>Contraseña</Text>
-                            <View style={styles.passwordContainer}>
-                                <TextInput
-                                    style={styles.passwordInput}
-                                    placeholder="Contraseña"
-                                    placeholderTextColor="#cbd5e1"
-                                    value={password}
-                                    onChangeText={setPassword}
-                                    secureTextEntry={!showPassword}
-                                    editable={!isLoading}
-                                />
-                                <TouchableOpacity
-                                    onPress={() => setShowPassword(!showPassword)}
-                                    disabled={isLoading}
-                                    style={styles.showPasswordBtn}
-                                >
-                                    <Text style={styles.showPasswordText}>
-                                        {showPassword ? "Ocultar" : "Mostrar"}
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-
-                            {/* Forgot Password */}
-                            <View style={styles.forgotContainer}>
-                                <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
-                            </View>
-
-                            {/* Login Button */}
-                            <TouchableOpacity
-                                onPress={handleLogin}
-                                disabled={isLoading}
-                                style={[styles.loginButton, isLoading && styles.loginButtonLoading]}
-                            >
-                                <Text style={styles.loginButtonText}>
-                                    {isLoading ? "Iniciando sesión..." : "INICIAR SESIÓN"}
-                                </Text>
-                            </TouchableOpacity>
-
-                            {/* Divider */}
-                            <View style={styles.dividerLine} />
-
-                            {/* Sign Up */}
-                            <View style={styles.signupContainer}>
-                                <Text style={styles.signupText}>¿No tienes cuenta? </Text>
-                                <TouchableOpacity disabled={isLoading} onPress={() => router.push('/register')}>
-                                    <Text style={styles.signupLink}>Crea una aquí</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-
-                        {/* Footer */}
-                        <View style={styles.footer}>
-                            <Text style={styles.footerText}>© 2026 HO-MY. Todos los derechos reservados.</Text>
-                        </View>
+                        <LoginHeader />
+                        <LoginTitle />
+                        <LoginForm
+                            email={email}
+                            password={password}
+                            onEmailChange={setEmail}
+                            onPasswordChange={setPassword}
+                        />
+                        <LoginButton onPress={handleLogin} isLoading={isLoading} />
+                        <AuthFooter />
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>

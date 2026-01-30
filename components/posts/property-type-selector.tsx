@@ -1,0 +1,80 @@
+import React from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
+
+interface PropertyType {
+    label: string;
+    value: string;
+}
+
+interface PropertyTypeSelectorProps {
+    selectedType: string;
+    onTypeChange: (type: string) => void;
+}
+
+const PROPERTY_TYPES: PropertyType[] = [
+    { label: 'Casa', value: 'HOUSE' },
+    { label: 'Departamento', value: 'APARTMENT' },
+    { label: 'Terreno', value: 'LAND' },
+    { label: 'Oficina', value: 'OFFICE' },
+    { label: 'Comercial', value: 'COMMERCIAL' },
+    { label: 'Almacén', value: 'WAREHOUSE' },
+    { label: 'Habitación', value: 'ROOM' },
+];
+
+export default function PropertyTypeSelector({
+    selectedType,
+    onTypeChange,
+}: PropertyTypeSelectorProps) {
+    return (
+        <>
+            <Text style={styles.fieldLabel}>Tipo de Inmueble</Text>
+            <ScrollView horizontal style={{ marginBottom: 16 }} showsHorizontalScrollIndicator={false}>
+                {PROPERTY_TYPES.map((type) => (
+                    <TouchableOpacity
+                        key={type.value}
+                        style={[styles.checkboxItem, selectedType === type.value && styles.checkboxItemActive]}
+                        onPress={() => onTypeChange(type.value)}
+                    >
+                        <Text
+                            style={[styles.checkboxText, selectedType === type.value && styles.checkboxTextActive]}
+                        >
+                            {type.label}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </ScrollView>
+        </>
+    );
+}
+
+const styles = StyleSheet.create({
+    fieldLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#5585b5',
+        marginBottom: 8,
+        letterSpacing: 0.3,
+        textTransform: 'uppercase',
+    },
+    checkboxItem: {
+        backgroundColor: '#f0f4ff',
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderWidth: 1.5,
+        borderColor: '#e2e8f0',
+        marginRight: 8,
+    },
+    checkboxItemActive: {
+        backgroundColor: '#5585b5',
+        borderColor: '#5585b5',
+    },
+    checkboxText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#5585b5',
+    },
+    checkboxTextActive: {
+        color: '#ffffff',
+    },
+});

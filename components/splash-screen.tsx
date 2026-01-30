@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 
 const styles = StyleSheet.create({
   container: {
@@ -7,26 +7,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  topSection: {
+    alignItems: 'center',
+  },
   logoContainer: {
     alignItems: 'center',
   },
-  logo: {
-    fontSize: 60,
-    marginBottom: 16,
-  },
-  appName: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1e40af',
+  logoImage: {
+    width: 200,
+    height: 200,
   },
 });
 
 export default function SplashScreen() {
   return (
     <View style={styles.container}>
-      <View style={styles.logoContainer}>
-        <Text style={styles.logo}>🏡</Text>
-        <Text style={styles.appName}>Homi</Text>
+      {/* Top Section - Logo & Brand */}
+      <View style={styles.topSection}>
+        <View style={styles.logoContainer}>
+          <Image
+            source={require('@/assets/logos/BigLogo.jpeg')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
+        </View>
       </View>
     </View>
   );

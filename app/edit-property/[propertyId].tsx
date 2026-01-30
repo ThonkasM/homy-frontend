@@ -482,7 +482,7 @@ export default function EditPropertyScreen() {
     const scrollViewRef = useRef<ScrollView>(null);
 
     // MapViewComponent para seleccionar ubicación
-    const MapViewComponent = require('@/components/map-view-property').default;
+    const MapViewComponent = require('@/components/posts/map-view-property').default;
 
     // Cargar datos de la propiedad
     useEffect(() => {

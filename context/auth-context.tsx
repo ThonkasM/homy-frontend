@@ -30,26 +30,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const restoreSession = async () => {
       try {
-        const guestMode = await AsyncStorage.getItem('guestMode');
-        if (guestMode === 'true') {
-          setIsGuest(true);
-          setIsLoading(false);
-          return;
-        }
+        // NO restaurar modo invitado - debe ser una acción explícita en cada sesión
+        // Limpiar cualquier guestMode guardado previamente
+        await AsyncStorage.removeItem('guestMode');
 
         const savedToken = await AsyncStorage.getItem('authToken');
         const savedUser = await AsyncStorage.getItem('authUser');
 
-        if (savedToken) {
+        if (savedToken && savedUser) {
           apiService.setToken(savedToken);
 
           // Validar que el token siga siendo válido
           const isValid = await apiService.validateToken(savedToken);
 
-          if (isValid && savedUser) {
+          if (isValid) {
             setToken(savedToken);
             setUser(JSON.parse(savedUser));
-            setIsGuest(false); // Desactivar modo invitado
+            setIsGuest(false);
           } else {
             // Token inválido, limpiar
             await AsyncStorage.removeItem('authToken');
@@ -183,12 +180,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       setError(null);
 
-      // Guardar en storage que es modo invitado
-      await AsyncStorage.setItem('guestMode', 'true');
-
+      // NO guardar en storage - el modo invitado no debe persistir entre sesiones
       // Limpiar cualquier sesión anterior
       await AsyncStorage.removeItem('authToken');
       await AsyncStorage.removeItem('authUser');
+      await AsyncStorage.removeItem('guestMode');
 
       // Actualizar estado
       apiService.clearToken();
